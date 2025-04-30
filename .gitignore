@@ -172,3 +172,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+.vscode
+jython-standalone-2.7.4.jar
+sikulixapi-2.0.5.jar
