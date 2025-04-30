@@ -32,7 +32,17 @@ class GraphApp:
             node, neighbors = line.split(":")
             node = node.strip()
             neighbors = [n.strip() for n in neighbors.split(",") if n.strip()]
-            graph_dict[node] = neighbors
+            
+           
+            if node not in graph_dict:
+                graph_dict[node] = []
+         
+            for neighbor in neighbors:
+                if neighbor not in graph_dict[node]:
+                    graph_dict[node].append(neighbor)
+          
+                if neighbor not in graph_dict:
+                    graph_dict[neighbor] = []
         return graph_dict
 
     def draw_graph(self):
@@ -40,15 +50,20 @@ class GraphApp:
         try:
             graph_data = self.parse_adjacency_list(raw_text)
 
+         
             G = nx.DiGraph()
             for node, neighbors in graph_data.items():
                 for neighbor in neighbors:
                     G.add_edge(node, neighbor)
 
+            self.ax.clear()
+
+            
             pos = nx.spring_layout(G)
             nx.draw(G, pos, ax=self.ax, with_labels=True, arrows=True,
                     node_color="lightgreen", node_size=2000, font_size=10)
 
+           
             self.ax.set_title("Directed Graph")
             self.canvas.draw()
 
