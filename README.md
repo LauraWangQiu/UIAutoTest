@@ -31,8 +31,18 @@ Additionally, [Python](https://www.python.org/downloads/) will be used as the sc
 python downloadDependencies.py
 ```
 
+### Install Python packages requirements
+
+```cmd
+pip install -r requirements.txt
+```
+
 ## Try it
 
 ```ps
 java -cp "sikulixapi-2.0.5.jar;jython-standalone-2.7.4.jar" org.python.util.jython test_script.py
+```
+
+```ps
+python UIAutoTest.py
 ```
