@@ -105,7 +105,7 @@ class Graph:
         self.startNode = _node
 
     # Recursive function to visit all the nodes using dfs
-    def dfs(self, actual:Node = None, visited:list = None):
+    def dfs(self, actual:Node = None, visited:set = None) -> set:
         if visited is None:
             visited = set()
         if actual is None:
@@ -113,12 +113,15 @@ class Graph:
             
         # If the actual node has been visited, it returns
         if actual in visited:
-            return
-        print(f"fisiting node: {actual.name}")
+            return visited
+        print(f"visiting node: {actual.name}")
         # We go through the entire list of transitions and its destinations
         for transition in actual.transitions:
             if transition.is_valid(): # if condition is valid then check it destinations
                 self.dfs(transition.destination, visited)
+        
+        # Returns the visited nodes
+        return visited
 
 g = Graph()
 n1 = g.add_node("1", Path("imgs/image.png"))
@@ -133,8 +136,8 @@ g.add_transition(n1,n3)
 g.add_transition(n3,n4)
 g.add_transition(n3,n5)
 
-g.dfs()
+g.dfs(n3)
 
 g.remove_node(n3)
-
-g.dfs()
+visit = g.dfs()
+print(visit.pop)
