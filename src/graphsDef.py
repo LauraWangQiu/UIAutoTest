@@ -115,6 +115,8 @@ class Graph:
         if actual in visited:
             return visited
         print(f"visiting node: {actual.name}")
+        # Add the actual node to the visited nodes set
+        visited.add(actual)
         # We go through the entire list of transitions and its destinations
         for transition in actual.transitions:
             if transition.is_valid(): # if condition is valid then check it destinations
@@ -123,21 +125,30 @@ class Graph:
         # Returns the visited nodes
         return visited
 
-g = Graph()
-n1 = g.add_node("1", Path("imgs/image.png"))
-n2 = g.add_node("2", Path("imgs/image.png"))
-n3 = g.add_node("3", Path("imgs/image.png"))
-n4 = g.add_node("4", Path("imgs/image.png"))
-n5 = g.add_node("5", Path("imgs/image.png"))
+# --------------------
+# Example of use
+# --------------------
 
-g.set_start_node(n1)
-g.add_transition(n1,n2)
-g.add_transition(n1,n3)
-g.add_transition(n3,n4)
-g.add_transition(n3,n5)
+# g = Graph()
+# n1 = g.add_node("1", Path("imgs/image.png"))
+# n2 = g.add_node("2", Path("imgs/image.png"))
+# n3 = g.add_node("3", Path("imgs/image.png"))
+# n4 = g.add_node("4", Path("imgs/image.png"))
+# n5 = g.add_node("5", Path("imgs/image.png"))
 
-g.dfs(n3)
+# g.set_start_node(n1)
+# g.add_transition(n1,n2)
+# g.add_transition(n1,n3)
+# g.add_transition(n3,n4)
+# g.add_transition(n3,n5)
 
-g.remove_node(n3)
-visit = g.dfs()
-print(visit.pop)
+# g.dfs(n3)
+# --->  Had visitted:   3, 4, 5
+
+# g.remove_node(n3)
+
+# visit = g.dfs()
+# --->  Had visitted:   1, 2
+
+# print([v.name for v in visit])
+# --->  Prints:         ['1', '2']
