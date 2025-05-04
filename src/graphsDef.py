@@ -147,6 +147,44 @@ class Graph:
         
         # Returns the visited nodes
         return visited
+    
+    # A star algorithm. More or less.
+    def a_star(self, cost: int, src: Node, dst: Node, actual: Node = None, path: set = None) -> set:
+        # If the src and the dst are the same then it returns.
+        if src == dst:
+            print("Source node and destination node are the same.")
+            return path
+        # If path is not set then it is created.
+        if path == None:
+            path = set()
+        # If actual is not set then it is the source.
+        if actual == None:
+            actual = src
+        # If actual is the destination then return path.
+        if actual == dst:
+            path.add(actual)
+            return path
+        
+        path.add(actual) # Add the actual node to the path.
+        
+        paths = [] # List of paths.
+        
+        # Checks every transition in the node.
+        for transition in actual.transitions:
+            # If it is valid then the destination is saved.
+            if transition.is_valid():   
+                 neighbor = transition.destination
+                 # If it is not in the path then it continues.
+                 if neighbor not in path:
+                     aux_path = self.a_star(cost + 1, src, dst, neighbor, path.copy())
+                     if aux_path is not None and dst in aux_path:
+                         paths.append(aux_path)
+        
+        # Returns the shorter path.
+        if paths:
+            return min(paths, key = len)
+    
+    
     def update_node_name(self, node: Node, new_name: str):
             """
             Updates the name of a node and ensures all transitions pointing to it remain valid.
