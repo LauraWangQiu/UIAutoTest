@@ -25,6 +25,10 @@ For this project, it will be developed and only tested for Windows systems. Plea
 
 Additionally, [Python](https://www.python.org/downloads/) will be used as the scripting language to interact with the Sikulix API.
 
+### Other aspects
+
+> [!IMPORTANT] All the images must have sufficient quality to be clicked and displayed in the executable large enough.
+
 ### Download Sikulix API and Jython
 
 ```py
