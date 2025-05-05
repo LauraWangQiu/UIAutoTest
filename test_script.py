@@ -1,38 +1,88 @@
 # -*- coding: utf-8 -*-
 import os
-from sikuli import Screen, Pattern, Region
+import sys
+from sikuli import Screen, Pattern
 
-# Imprimir la ruta actual
-current_path = os.getcwd()
-image_path = os.path.join(current_path, "imgs", "image.png")
+def load_graph(graph_file, img_dir):
+    vertices = {}
+    edges = []
+    with open(graph_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):# skip empty lines or comments
+                continue
+            parts = line.split()
+            if parts[0] == 'v' and len(parts) >= 3: # vertex definition
+                name = parts[1]
+                raw_path = " ".join(parts[2:]).strip('"')# image path
+                vertices[name] = os.path.join(img_dir, raw_path)
+            elif parts[0] == 'e' and len(parts) >= 4: # edge definition
+                src = parts[1]
+                tgt = parts[2]
+                raw_path = " ".join(parts[3:]).strip('"')
+                edges.append((src, tgt, os.path.join(img_dir, raw_path)))
+    return vertices, edges
 
-screen = Screen()
+def main():
+    cwd       = os.getcwd()
+    img_dir   = os.path.join(cwd, "imgs")
+    graph_txt = os.path.join(cwd, "graph.txt")
 
-# Click directly on the image
-screen.click(image_path)
+    vertices, edges = load_graph(graph_txt, img_dir)
+    
+    # check if vertices are defined
+    if not vertices:
+        print("[ERROR] No vertices found in graph.txt")
+        sys.exit(1)
 
-screen_width = screen.w
-screen_height = screen.h
-print("Screen dimensions: {}x{}".format(screen_width, screen_height))
+    if not edges:
+        print("[INFO] No transitions defined — nothing to traverse")
+        sys.exit(0)
 
-# Create a region to search for the image
-region = Region(400, 900, 350, 60)
+    screen     = Screen()
+    similarity = 0.7
+    timeout    = 10
 
-# Save the region screenshot for debugging
-region_screenshot_path = os.path.join(current_path, "region_screenshot.png")
-screen.capture(region).save(current_path, "region_screenshot.png")
-print("Region screenshot saved at: {}".format(region_screenshot_path))
+    for src, tgt, btn_path in edges:
+        if src not in vertices: # Check if the source vertex is defined
+            print("[ERROR] Source vertex '"+src+"' not defined")
+            sys.exit(1)
+        if tgt not in vertices:
+            print("[ERROR] Target vertex '"+tgt+"' not defined")
+            sys.exit(1)
 
-# Adjust the precision of the image search
-image = Pattern(image_path).similar(0.7)
+        src_img = vertices[src]
+        tgt_img = vertices[tgt]
 
-# Search in the specified region for the image
-# and click on it if found
-if region.exists(image, 10):  # Search for 10 seconds
-    region.click(image)
-    print("Button found and clicked")
-else:
-    print("Button not found")
-    # Save a screenshot of the region for debugging
-    screen.capture(region).save(current_path, "debug_screenshot.png")
-    print("Screenshot saved as debug_screenshot.png")
+        # 1) Wait for source node
+        print("Waiting for node '"+src+"': "+src_img)
+        if not screen.wait(Pattern(src_img).similar(similarity), timeout):
+            print("[ERROR] Node '"+src+"' not found")
+            screen.capture().save(cwd, "error_wait_"+src+".png")
+            sys.exit(1)
+        print("[OK] Node '"+src+"' detected")
+
+        # 2) Click the button for this edge
+        print("Clicking button for edge "+src+" -> "+tgt+": "+btn_path)
+        if screen.exists(Pattern(btn_path).similar(similarity), timeout):
+            screen.click(btn_path)
+            print("[OK] Clicked button from '"+src+"' to '"+tgt+"'.")
+        else:
+            print("[ERROR] Button image for edge "+src+" -> "+tgt+" not found")
+            screen.capture().save(cwd, "error_button_"+src+"_"+tgt+".png")
+            sys.exit(1)
+
+        # 3) Verify that the target node appears
+        print("Verifying node '"+tgt+"': "+tgt_img)
+        if screen.exists(Pattern(tgt_img).similar(similarity), timeout):
+            print("[OK] Node '"+tgt+"' detected")
+        else:
+            print("[FAIL] Node '"+tgt+"' not found after click.")
+            screen.capture().save(cwd, "error_result_"+src+"_"+tgt+".png")
+            sys.exit(1)
+
+    print("[COMPLETE] All transitions completed successfully")
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
