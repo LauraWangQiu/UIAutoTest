@@ -65,6 +65,9 @@ class App(ctk.CTk):
         for test_class_name, test_class_ref in test_classes:
             self.add_test_tab(test_class_name, test_class_ref)
 
+        # Test Runner tab
+        self.add_test_runner_tab()
+
         # Output tab
         self.add_terminal_tab()
 
@@ -94,18 +97,11 @@ class App(ctk.CTk):
         # Left panel: button to remove nodes
         remove_node_button = ctk.CTkButton(self.left_panel, text="Remove Selected State/s", command=self.remove_selected_nodes)
         remove_node_button.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
-        # Left panel: entry to display the selected executable path
-        self.executable_entry = ctk.CTkEntry(self.left_panel, state="readonly", font=ctk.CTkFont(size=12))
-        self.executable_entry.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
-        self.executable_entry.insert(0, "Executable: None")
-        # Left panel: button to select executable
-        select_executable_button = ctk.CTkButton(self.left_panel, text="Select Executable", command=self.select_executable)
-        select_executable_button.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: subpanel to show all existing nodes with scrollbar
         self.nodes_canvas = ctk.CTkCanvas(self.left_panel, bg="#2b2b2b", highlightthickness=0)
-        self.nodes_canvas.grid(row=5, column=0, padx=10, pady=10, sticky="nsew")
+        self.nodes_canvas.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
         self.nodes_scrollbar = ctk.CTkScrollbar(self.left_panel, orientation="vertical", command=self.nodes_canvas.yview)
-        self.nodes_scrollbar.grid(row=5, column=1, sticky="ns", padx=(0, 10))
+        self.nodes_scrollbar.grid(row=3, column=1, sticky="ns", padx=(0, 10))
         self.nodes_canvas.configure(yscrollcommand=self.nodes_scrollbar.set)
         self.nodes_frame = ctk.CTkFrame(self.nodes_canvas)
         self.nodes_frame_id = self.nodes_canvas.create_window((0, 0), window=self.nodes_frame, anchor="nw")
@@ -558,51 +554,118 @@ class App(ctk.CTk):
         The tab will contain a button to run the test and the needed arguments.
     """
     def add_test_tab(self, test_class_name, test_class_ref):
-        new_tab = ctk.CTkFrame(self.tab_control)
-        self.tab_control.add(new_tab, text=test_class_name)
+        test_instance = test_class_ref()
+        tab_name = getattr(test_instance, "name", test_class_name)
 
-        label = ctk.CTkLabel(new_tab, text=f"Content for {test_class_name}")
+        new_tab = ctk.CTkFrame(self.tab_control)
+        self.tab_control.add(new_tab, text=tab_name)
+
+        label = ctk.CTkLabel(new_tab, text=f"Attributes for {tab_name}", font=ctk.CTkFont(size=14, weight="bold"))
         label.pack(pady=10)
 
-        # Add a button to run the test
-        run_button = ctk.CTkButton(
-            new_tab, text="Run Test", command=lambda: self.run_test(test_class_name, test_class_ref)
-        )
+        attributes_frame = ctk.CTkFrame(new_tab)
+        attributes_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Show the attributes of the test class
+        for attr_name, attr_value in vars(test_instance).items():
+            if attr_name.startswith("_"):
+                continue
+
+            # Show sets as a listbox
+            if isinstance(attr_value, set):
+                attr_label = ctk.CTkLabel(attributes_frame, text=f"{attr_name}:", font=ctk.CTkFont(size=12))
+                attr_label.pack(anchor="w", padx=5, pady=2)
+                attr_value = list(attr_value)
+                attr_listbox = ctk.CTkTextbox(attributes_frame, height=100)
+                attr_listbox.insert("1.0", "\n".join(map(str, attr_value)))
+                attr_listbox.configure(state="disabled")
+                attr_listbox.pack(fill="x", padx=5, pady=2)
+            # TODO: Add the needed arguments to run the test
+            # elif isinstance(attr_value, list):
+
+    # ==============================================================================================
+    # TESTS RUNNER & COMPARISON TAB
+    # ==============================================================================================
+    """
+        Select tests to run and compare results.
+    """
+    def add_test_runner_tab(self):
+        test_runner_tab = ctk.CTkFrame(self.tab_control)
+        self.tab_control.add(test_runner_tab, text="Run Tests & Compare")
+
+        # Entry to display the selected executable path
+        self.executable_entry = ctk.CTkEntry(test_runner_tab, state="readonly", font=ctk.CTkFont(size=12))
+        self.executable_entry.insert(0, "Executable: None")
+        self.executable_entry.pack(fill="x", padx=10, pady=5)
+
+        # Button to select executable
+        select_executable_button = ctk.CTkButton(test_runner_tab, text="Select Executable", command=self.select_executable)
+        select_executable_button.pack(fill="x", padx=10, pady=5)
+
+        # Title
+        title_label = ctk.CTkLabel(test_runner_tab, text="Select Tests to Run", font=ctk.CTkFont(size=16, weight="bold"))
+        title_label.pack(pady=10)
+
+        # Frame for the list of tests
+        self.test_list_frame = ctk.CTkFrame(test_runner_tab)
+        self.test_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Populate the list of tests
+        self.populate_test_list()
+
+        # Run tests button
+        run_button = ctk.CTkButton(test_runner_tab, text="Run Tests", command=self.run_tests)
         run_button.pack(pady=10)
 
+        # Compare button
+        compare_button = ctk.CTkButton(test_runner_tab, text="Compare Results", command=self.compare)
+        compare_button.pack(pady=10)
+
     """
-        Runs the executable selected in the States tab and then runs the test class.
-        
-        Atributes:
-            test_class_name (str): Name of the test class to run.
-            test_class_ref (class): Reference to the test class to run.
+        Populate the test list with checkboxes for each test class found in the specified directory.
+        Each checkbox is associated with a test class reference.
     """
-    def run_test(self, test_class_name, test_class_ref):
+    def populate_test_list(self):
+        for widget in self.test_list_frame.winfo_children():
+            widget.destroy()
+
+        test_classes = self.get_test_classes()
+
+        # Add each test as a checkbox
+        self.test_checkboxes = {}
+        for test_class_name, test_class_ref in test_classes:
+            var = ctk.BooleanVar(value=False)
+            checkbox = ctk.CTkCheckBox(self.test_list_frame, text=test_class_name, variable=var)
+            checkbox.pack(anchor="w", padx=5, pady=2)
+            self.test_checkboxes[test_class_name] = (var, test_class_ref)
+
+    """
+        Run the selected tests.
+    """
+    def run_tests(self):
         if not self.selected_executable:
-            print("No executable selected. Please select an executable first in States menu.")
+            print("No executable selected. Please select an executable first.")
             return
 
-        """
-            Execute the selected executable in a secondary thread and notify the main thread to run the test.
-        """
-        def execute_and_notify():
-            try:
-                print(f"Executing {self.selected_executable} in secondary thread")
-                subprocess.Popen([self.selected_executable])
-            except FileNotFoundError:
-                print(f"Executable not found: {self.selected_executable}")
-                return
-            self.after(self.delay_ms_executable, run_test_in_main_thread)
+        selected_tests = [
+            test_class_ref for test_class_name, (var, test_class_ref) in self.test_checkboxes.items() if var.get()
+        ]
 
-        """
-            Run the test in the main thread after a delay to ensure the executable is running.
-        """
-        def run_test_in_main_thread():
-            print(f"Running test: {test_class_name}")
-            test_instance = test_class_ref()
+        if not selected_tests:
+            print("No tests selected.")
+            return
+        
+        for test_class_ref in selected_tests:
+            test_instance = test_class_ref(self.selected_executable)
             test_instance.run()
 
-        threading.Thread(target=execute_and_notify, daemon=True).start()
+    """
+        Compare the generated graph with specified graph.
+    """
+    def compare(self):
+        # TODO: Get the file generated and the expected graph and compare them
+        # Also, save the generated results of the tests
+        print("Comparing results...")
 
     # ==============================================================================================
     # TERMINAL TAB
@@ -619,7 +682,7 @@ class App(ctk.CTk):
         self.terminal_output.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Redirect stdout to the terminal output
-        sys.stdout = TextRedirector(self.terminal_output)
+        sys.stdout = self.TextRedirector(self.terminal_output)
 
     """
         Restore the original stdout when the application is closed.
@@ -628,24 +691,24 @@ class App(ctk.CTk):
         sys.stdout = sys.__stdout__
         self.destroy()
 
-"""
+    """
     Redirect stdout to a ScrolledText widget.
-"""
-class TextRedirector:
-    def __init__(self, text_widget):
-        self.text_widget = text_widget
+    """
+    class TextRedirector:
+        def __init__(self, text_widget):
+            self.text_widget = text_widget
 
-    """
-        Write the message to the ScrolledText widget.
-    """
-    def write(self, message):
-        self.text_widget.configure(state="normal")
-        self.text_widget.insert("end", message)
-        self.text_widget.configure(state="disabled")
-        self.text_widget.see("end")
+        """
+            Write the message to the ScrolledText widget.
+        """
+        def write(self, message):
+            self.text_widget.configure(state="normal")
+            self.text_widget.insert("end", message)
+            self.text_widget.configure(state="disabled")
+            self.text_widget.see("end")
 
-    """
-        Flush the output buffer.
-    """
-    def flush(self):
-        pass
+        """
+            Flush the output buffer.
+        """
+        def flush(self):
+            pass
