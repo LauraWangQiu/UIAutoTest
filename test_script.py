@@ -23,6 +23,35 @@ def load_graph(graph_file, img_dir):
                 edges.append((src, tgt, os.path.join(img_dir, raw_path)))
     return vertices, edges
 
+def search_image(screen, image_path, similarity=0.9, timeout=10, retries=3, similarity_reduction = 0.1 ):
+    for attempt in range(retries):
+        actual_attempt = attempt + 1
+        actual_similarity = similarity - (similarity_reduction*attempt)
+        print("Attempts " + str(actual_attempt) + "/" + str(retries))
+        match = screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
+        if match:
+            print("[OK] Image found.")
+            return True
+        else:
+            print("[WARNING] Not found. Trying again...")
+
+    return False
+
+def click_image(screen, image_path, similarity=0.9, timeout=10, retries=3, similarity_reduction = 0.1 ):
+    for attempt in range(retries):
+        actual_attempt = attempt + 1
+        actual_similarity = similarity - (similarity_reduction*attempt)
+        print("Attempts " + str(actual_attempt) + "/" + str(retries))
+        match = screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
+        if match:
+            screen.click(Pattern(image_path).similar(actual_similarity))
+            print("[OK] Clicked image.")
+            return True
+        else:
+            print("[WARNING] Not found. Trying again...")
+
+    return False
+
 def main():
     cwd       = os.getcwd()
     img_dir   = os.path.join(cwd, "imgs")
@@ -41,7 +70,7 @@ def main():
 
     screen     = Screen()
     similarity = 0.7
-    timeout    = 10
+    timeout    = 2
 
     for src, tgt, btn_path in edges:
         if src not in vertices: # Check if the source vertex is defined
@@ -56,16 +85,16 @@ def main():
 
         # 1) Wait for source node
         print("Waiting for node '"+src+"': "+src_img)
-        if not screen.wait(Pattern(src_img).similar(similarity), timeout):
-            print("[ERROR] Node '"+src+"' not found")
-            screen.capture().save(cwd, "error_wait_"+src+".png")
+        if not search_image(screen, src_img, similarity, timeout):
+            print("[ERROR] Node "+src+ "not detected after some tries.")
+            screen.capture().save(cwd,"error_wait_"+{src}+".png")
             sys.exit(1)
+
         print("[OK] Node '"+src+"' detected")
 
         # 2) Click the button for this edge
         print("Clicking button for edge "+src+" -> "+tgt+": "+btn_path)
-        if screen.exists(Pattern(btn_path).similar(similarity), timeout):
-            screen.click(btn_path)
+        if click_image(screen,btn_path,similarity,timeout):
             print("[OK] Clicked button from '"+src+"' to '"+tgt+"'.")
         else:
             print("[ERROR] Button image for edge "+src+" -> "+tgt+" not found")
@@ -74,7 +103,7 @@ def main():
 
         # 3) Verify that the target node appears
         print("Verifying node '"+tgt+"': "+tgt_img)
-        if screen.exists(Pattern(tgt_img).similar(similarity), timeout):
+        if search_image(screen,tgt_img,similarity,timeout):
             print("[OK] Node '"+tgt+"' detected")
         else:
             print("[FAIL] Node '"+tgt+"' not found after click.")
