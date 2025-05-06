@@ -8,13 +8,15 @@
 #   • NAME: unique identifier (no spaces)
 #   • IMAGE_PATH: relative path to the vertex’s PNG file 
 
-v A initial.png
-v B resultado.png
+v A prueba.png
+v B prueba2.png
+v C unity.png
 
 # Directed edges section
 # Each edge is declared as:
 #   e <SOURCE_NAME> <TARGET_NAME> <IMAGE_PATH>
 #    • IMAGE_PATH: image path of the button. Relative path to the vertex’s PNG file
 
-e A B boton.png
-e B A boton2.png
+e CLICK A B imagen2.png
+e CLICK B A boton3.png
+e CLICK_AND_TYPE Unity A C image3.png
