@@ -1,0 +1,651 @@
+import os
+import sys
+import math
+import subprocess
+import threading
+import inspect
+import importlib.util
+import customtkinter as ctk
+import tkinter.ttk as ttk
+from tkinter import filedialog
+from tkinter.scrolledtext import ScrolledText
+from pathlib import Path
+from src.test import Test
+from src.graphsDef import Graph
+from src.graphsDef import Transition
+
+class App(ctk.CTk):  
+    def __init__(self, window_name="UI Auto Test", window_size="800x600", tests_directory="tests"):
+        super().__init__()
+        
+        self.selected_executable = None
+        self.tests_dir = tests_directory
+
+        self.title(window_name)
+        self.geometry(window_size)
+
+        self.configure_grid()
+
+        self.graph = Graph()
+        self.selected_nodes = []
+        self.node_frames = []
+        self.node_frames_index = 1
+
+        self.delay_ms_tabs = 100
+        self.delay_ms_executable = 1000
+
+        self.after(self.delay_ms_tabs, self.create_tabs)
+    
+    """
+        Configure the grid layout of the main window.
+    """
+    def configure_grid(self):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+   
+    """
+        Create the tabs: States and Tests.
+        The Tests tab is created dynamically based on the test classes found in the specified directory.
+    """
+    def create_tabs(self):
+        style = ttk.Style()
+        style.configure("TNotebook.Tab", padding=[20, 10])
+        style.configure("TNotebook", tabposition="nw")
+
+        self.tab_control = ttk.Notebook(self)
+        self.tab_control.grid(row=0, column=0, sticky="nsew")
+
+        # States tab
+        self.states_tab = ctk.CTkFrame(self.tab_control)
+        self.tab_control.add(self.states_tab, text="States")
+        self.configure_states_tab()
+
+        # Tests tabs
+        test_classes = self.get_test_classes()
+        for test_class_name, test_class_ref in test_classes:
+            self.add_test_tab(test_class_name, test_class_ref)
+
+        # Output tab
+        self.add_terminal_tab()
+
+    """
+        Configure the States tab layout.
+    """
+    def configure_states_tab(self):
+        self.states_tab.grid_columnconfigure(0, weight=1)
+        self.states_tab.grid_rowconfigure(0, weight=1)
+
+        self.split_frame = ctk.CTkFrame(self.states_tab)
+        self.split_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.split_frame.grid_columnconfigure(0, weight=1, minsize=300)  # left panel
+        self.split_frame.grid_columnconfigure(1, weight=3)               # right panel
+        self.split_frame.grid_rowconfigure(0, weight=1)
+
+        # Left panel
+        self.left_panel = ctk.CTkFrame(self.split_frame)
+        self.left_panel.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.left_panel.grid_columnconfigure(0, weight=1)
+        # Left panel: title
+        title_label = ctk.CTkLabel(self.left_panel, text="States Configuration", font=ctk.CTkFont(size=16, weight="bold"))
+        title_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        # Left panel: button to add nodes
+        add_node_button = ctk.CTkButton(self.left_panel, text="Add State", command=self.add_node)
+        add_node_button.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        # Left panel: button to remove nodes
+        remove_node_button = ctk.CTkButton(self.left_panel, text="Remove Selected State/s", command=self.remove_selected_nodes)
+        remove_node_button.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+        # Left panel: entry to display the selected executable path
+        self.executable_entry = ctk.CTkEntry(self.left_panel, state="readonly", font=ctk.CTkFont(size=12))
+        self.executable_entry.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+        self.executable_entry.insert(0, "Executable: None")
+        # Left panel: button to select executable
+        select_executable_button = ctk.CTkButton(self.left_panel, text="Select Executable", command=self.select_executable)
+        select_executable_button.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
+        # Left panel: subpanel to show all existing nodes with scrollbar
+        self.nodes_canvas = ctk.CTkCanvas(self.left_panel, bg="#2b2b2b", highlightthickness=0)
+        self.nodes_canvas.grid(row=5, column=0, padx=10, pady=10, sticky="nsew")
+        self.nodes_scrollbar = ctk.CTkScrollbar(self.left_panel, orientation="vertical", command=self.nodes_canvas.yview)
+        self.nodes_scrollbar.grid(row=5, column=1, sticky="ns", padx=(0, 10))
+        self.nodes_canvas.configure(yscrollcommand=self.nodes_scrollbar.set)
+        self.nodes_frame = ctk.CTkFrame(self.nodes_canvas)
+        self.nodes_frame_id = self.nodes_canvas.create_window((0, 0), window=self.nodes_frame, anchor="nw")
+        self.nodes_frame.grid_columnconfigure(0, weight=1)
+        self.nodes_canvas.bind(
+            "<Configure>",
+            lambda e: self.nodes_canvas.itemconfig(self.nodes_frame_id, width=self.nodes_canvas.winfo_width())
+        )
+        self.nodes_canvas.grid_remove()
+        self.nodes_scrollbar.grid_remove()
+
+        # Right panel
+        self.right_panel = ctk.CTkFrame(self.split_frame)
+        self.right_panel.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        self.right_panel.grid_rowconfigure(0, weight=1)
+        self.right_panel.grid_columnconfigure(0, weight=1)
+        # Right panel: canvas to draw graph
+        self.canva = ctk.CTkCanvas(self.right_panel, bg="white", height=400)
+        self.canva.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.canva.bind("<Configure>", lambda event: self.on_canvas_resize(event)) # Resize
+
+        self.draw_graph()
+    
+    # ==============================================================================================
+    # LEFT PANEL
+    # ==============================================================================================
+    """
+        Create a frame for each node in the graph.
+
+        Atributes:
+            node (Node): The node to create the frame for.
+            index (int): The index of the node in the graph.
+    """
+    def create_node_frame(self, node, index):
+        frame = ctk.CTkFrame(self.nodes_frame, corner_radius=10)
+        frame.grid(row=index, column=0, padx=10, pady=5, sticky="ew")
+        frame._name = str(id(node))
+        
+        header_frame = ctk.CTkFrame(frame, corner_radius=0)
+        header_frame.pack(fill="x", padx=5, pady=5)
+
+        node.checkbox_var = ctk.BooleanVar(value=False)
+
+        def on_checkbox_change():
+            if node.checkbox_var.get():
+                if node not in self.selected_nodes:
+                    self.selected_nodes.append(node)
+                    print(f"Node {node.name} added to selected_nodes.")
+            else:
+                if node in self.selected_nodes:
+                    self.selected_nodes.remove(node)
+                    print(f"Node {node.name} removed from selected_nodes.")
+
+        checkbox = ctk.CTkCheckBox(header_frame, variable=node.checkbox_var, text="", command=on_checkbox_change)
+        checkbox.pack(side="left", padx=5)
+        
+        name_label = ctk.CTkLabel(header_frame, text=node.name, font=ctk.CTkFont(size=14))
+        name_label.pack(side="left", padx=5)
+
+        name_label.bind("<Button-1>", lambda e: self.make_label_editable(name_label, node))
+
+        toggle_button = ctk.CTkButton(
+            header_frame, text="▼", width=30, command=lambda: self.toggle_node_frame(frame, toggle_button)
+        )
+        toggle_button.pack(side="right", padx=5)
+
+        edit_frame = ctk.CTkFrame(frame, corner_radius=10)
+        edit_frame.pack(fill="x", padx=5, pady=5)
+        edit_frame.grid_columnconfigure(0, weight=1)
+        edit_frame.pack_forget()
+
+        connections_label = ctk.CTkLabel(edit_frame, text="Transitions:")
+        connections_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+        transitions_list_frame = ctk.CTkFrame(edit_frame)
+        transitions_list_frame.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+        transitions_list_frame.grid_columnconfigure(0, weight=1)
+        transitions_list_frame.grid_remove()
+
+        node.transitions_list_frame = transitions_list_frame
+
+        add_button = ctk.CTkButton(edit_frame, text="+", width=30, command=lambda n=node: self.add_connection(n))
+        add_button.grid(row=3, column=0, padx=5, pady=5, sticky="w")
+
+        remove_button = ctk.CTkButton(edit_frame, text="-", width=30, command=lambda n=node: self.delete_last_transition(node))
+        remove_button.grid(row=3, column=1, padx=5, pady=5, sticky="e")
+
+        self.node_frames.append((frame, edit_frame))
+
+        self.update_transitions_list(node)
+
+    """
+        Add a new node to the graph and create its corresponding UI elements.
+    """
+    def add_node(self):
+        node_name = f"State {self.node_frames_index}"
+        new_node = self.graph.add_node(node_name, Path("imgs/image.png"))
+        print(f"Added node: {node_name}")
+        self.create_node_frame(new_node, self.node_frames_index)
+        self.node_frames_index += 1
+        self.draw_graph()
+
+        if len(self.graph.nodes) > 0:
+            self.nodes_canvas.grid()
+            self.nodes_scrollbar.grid()
+
+        for node in self.graph.nodes:
+            if hasattr(node, "add_transition_menu"):
+                available_nodes = [n.name for n in self.graph.nodes if n != node]
+                node.add_transition_menu.configure(values=available_nodes)
+
+    """
+        Make the label editable by replacing it with an entry field.
+        When the user presses Enter or clicks outside the entry, the new text is saved and the label is updated.
+        The entry field is destroyed after saving the text.
+    """
+    def make_label_editable(self, label, node):
+        current_text = label.cget("text")
+
+        entry = ctk.CTkEntry(label.master, font=label.cget("font"))
+        entry.insert(0, current_text)
+        entry.pack(fill="x", padx=5, pady=5)
+
+        label.pack_forget()
+
+        def save_text(event=None):
+            new_text = entry.get()
+            if new_text.strip():
+                label.configure(text=new_text)
+                self.update_node_name(node, new_text)
+            entry.destroy()
+            label.pack(fill="x", padx=5, pady=5)
+
+        entry.bind("<Return>", save_text)
+        entry.bind("<FocusOut>", save_text)
+        entry.focus_set()
+
+    """
+        Toggle the visibility of the node frame and update the button text accordingly.
+
+        Atributes:
+            frame (CTkFrame): The frame to toggle.
+            toggle_button (CTkButton): The button that toggles the frame visibility.
+    """
+    def toggle_node_frame(self, frame, toggle_button):
+        for f, edit_frame in self.node_frames:
+            if f == frame:
+                if edit_frame.winfo_ismapped():
+                    edit_frame.pack_forget()
+                    toggle_button.configure(text="▼")
+                else:
+                    edit_frame.pack(fill="x", padx=5, pady=5)
+                    toggle_button.configure(text="▲")
+            else:
+                edit_frame.pack_forget()
+
+    """
+        Update the name of a node in the graph and redraw the graph.
+
+        Atributes:
+            node (Node): The node to update.
+            new_name (str): The new name for the node.
+        If the new name is empty, it does not update the node name.
+    """
+    def update_node_name(self, node, new_name):
+        if self.graph.update_node_name(node, new_name):
+            self.draw_graph()
+
+    """
+        Move a transition up in the list of transitions for a given node.
+        This function swaps the transition with the one above it in the list.
+
+        Atributes:
+            node (Node): The node whose transition list needs to be updated.
+            index (int): The index of the transition to move up.
+    """
+    def move_transition_up(self, node, index):
+        if index > 0:
+            node.transitions[index], node.transitions[index - 1] = node.transitions[index - 1], node.transitions[index]
+            self.update_transitions_list(node)
+            self.draw_graph()
+
+    """
+        Move a transition down in the list of transitions for a given node.
+        This function swaps the transition with the one below it in the list.
+        
+        Atributes:
+            node (Node): The node whose transition list needs to be updated.
+            index (int): The index of the transition to move down.
+    """
+    def move_transition_down(self, node, index):
+        if index < len(node.transitions) - 1:
+            node.transitions[index], node.transitions[index + 1] = node.transitions[index + 1], node.transitions[index]
+            self.update_transitions_list(node)
+            self.draw_graph()
+
+    """
+        Update the transitions list for a given node.
+
+        Atributes:
+            node (Node): The node whose transitions list needs to be updated.
+    """
+    def update_transitions_list(self, node):
+        for widget in node.transitions_list_frame.winfo_children():
+            widget.destroy()
+
+        for i, transition in enumerate(node.transitions):
+            transition_frame = ctk.CTkFrame(node.transitions_list_frame)
+            transition_frame.pack(fill="x", padx=5, pady=2)
+
+            transition_label = ctk.CTkLabel(transition_frame, text=f"→ {transition.destination.name}")
+            transition_label.pack(side="left", padx=5, pady=2)
+
+            if i > 0:
+                move_up_button = ctk.CTkButton(
+                    transition_frame, text="↑", width=30,
+                    command=lambda idx=i: self.move_transition_up(node, idx)
+                )
+                move_up_button.pack(side="right", padx=2)
+
+            if i < len(node.transitions) - 1:
+                move_down_button = ctk.CTkButton(
+                    transition_frame, text="↓", width=30,
+                    command=lambda idx=i: self.move_transition_down(node, idx)
+                )
+                move_down_button.pack(side="right", padx=2)
+
+    """
+        Add a connection to a node by creating a dropdown menu with available nodes.
+        The user can select a node from the menu to create a transition.
+        If the node already has a menu, it prompts the user to select a transition from the current menu before adding a new one.
+
+        Atributes:
+            node (Node): The node to which the transition is being added.
+    """
+    def add_connection(self, node):
+        if hasattr(node, "add_transition_menu"):
+            print("Please select a transition from the current menu before adding a new one.")
+            return
+
+        available_nodes = [n.name for n in self.graph.nodes if n != node]
+        if not available_nodes:
+            print("No available nodes to connect.")
+            return
+
+        node.transitions_list_frame.grid()
+
+        add_transition_menu = ctk.CTkOptionMenu(
+            node.transitions_list_frame,
+            values=available_nodes,
+            command=lambda selected: self.add_connection_to_node(node, selected)
+        )
+        add_transition_menu.pack(fill="x", padx=5, pady=5)
+
+        node.add_transition_menu = add_transition_menu
+
+    """
+        Add a connection to a node by creating a transition to the selected node.
+        This function is called when the user selects a node from the dropdown menu.
+
+        Atributes:
+            node (Node): The node to which the transition is being added.
+            selected_name (str): The name of the selected node from the dropdown menu.
+        If the selected node already has a transition to the current node, it does not add it again.
+    """
+    def add_connection_to_node(self, node, selected_name):
+        for n in self.graph.nodes:
+            if n.name == selected_name:
+                node.add_transition(Transition(n, lambda: True))
+                break
+
+        self.update_transitions_list(node)
+
+        if hasattr(node, "add_transition_menu"):
+            node.add_transition_menu.destroy()
+            delattr(node, "add_transition_menu")
+
+        self.draw_graph()
+
+    """
+        Delete the last transition from the list of transitions for a given node.
+        If the node has no transitions left, the transitions list frame is hidden.
+        If the node has an add transition menu, it is destroyed.
+        If the node has transitions, it deletes the last one and updates the transitions list.
+    """
+    def delete_last_transition(self, node):
+        if hasattr(node, "add_transition_menu"):
+            node.add_transition_menu.destroy()
+            delattr(node, "add_transition_menu")
+
+            if not node.transitions:
+                node.transitions_list_frame.grid_remove()
+
+            return
+
+        if node.transitions:
+            node.transitions.pop()
+            self.update_transitions_list(node)
+
+            if not node.transitions:
+                node.transitions_list_frame.grid_remove()
+
+        self.draw_graph()
+
+    """
+        Remove the selected nodes from the graph and update the graph.
+    """
+    def remove_selected_nodes(self):
+        nodes_to_remove = [node for node in self.graph.nodes if getattr(node, "checkbox_var", None) and node.checkbox_var.get()]
+        
+        if not nodes_to_remove:
+            print("No states selected for removal.")
+            return
+
+        for node in nodes_to_remove:
+            self.graph.remove_node(node)
+            print(f"Removed node: {node.name}")
+
+            for frame, edit_frame in self.node_frames:
+                if frame._name == str(id(node)):
+                    frame.destroy()
+                    if edit_frame:
+                        edit_frame.destroy()
+
+        self.node_frames = [(frame, edit_frame) for frame, edit_frame in self.node_frames if frame.winfo_exists()]
+        self.selected_nodes = [node for node in self.selected_nodes if node not in nodes_to_remove]
+
+        for node in self.graph.nodes:
+            node.transitions = [t for t in node.transitions if t.destination not in nodes_to_remove]
+            self.update_transitions_list(node)
+
+            if not node.transitions:
+                node.transitions_list_frame.grid_remove()
+
+        if len(self.graph.nodes) == 0:
+            self.nodes_canvas.grid_remove()
+            self.nodes_scrollbar.grid_remove()
+            self.node_frames_index = 1
+
+        self.draw_graph()
+
+    """
+        Select an executable file using a file dialog and update the entry field with the selected path.
+    """
+    def select_executable(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Executable",
+            filetypes=[("Executables", "*.exe"), ("All Files", "*.*")]
+        )
+        if file_path:
+            self.selected_executable = file_path
+            print(f"Selected executable: {self.selected_executable}")
+
+            self.executable_entry.configure(state="normal")
+            self.executable_entry.delete(0, "end")
+            self.executable_entry.insert(0, self.selected_executable)
+            self.executable_entry.configure(state="readonly")
+
+    # ==============================================================================================
+    # RIGHT PANEL
+    # ==============================================================================================
+    """
+        Handle the canvas resize event to redraw the graph.
+    """
+    def on_canvas_resize(self, event):
+        self.draw_graph()
+
+    """
+        Draw the graph on the canvas.
+        This function calculates the positions of the nodes and draws them along with the transitions.
+    """
+    def draw_graph(self):
+        self.canva.delete("all")
+        node_positions = {}
+        width = self.canva.winfo_width() or 600
+        height = self.canva.winfo_height() or 400
+
+        num_nodes = len(self.graph.nodes)
+        center_x = width // 2
+        center_y = height // 2
+        radius = min(width, height) // 2  
+
+        for i, node in enumerate(self.graph.nodes):
+            angle = (2 * math.pi / num_nodes) * i
+            x = center_x + int(radius * 0.8 * math.cos(angle))
+            y = center_y + int(radius * 0.8 * math.sin(angle))
+            node_positions[node] = (x, y)
+
+        # Draw nodes
+        node_radius = 20
+        for node, (x, y) in node_positions.items():
+            self.canva.create_oval(
+                x - node_radius, y - node_radius, x + node_radius, y + node_radius,
+                fill="lightblue", outline="black", width=2, tags=node.name
+            )
+            self.canva.create_text(x, y, text=node.name, font=("Arial", 12), tags=node.name)
+
+        # Draw transitions
+        for node in self.graph.nodes:
+            x1, y1 = node_positions[node]
+            for transition in node.transitions:
+                x2, y2 = node_positions[transition.destination]
+
+                # Line angle
+                dx = x2 - x1
+                dy = y2 - y1
+                distance = math.sqrt(dx**2 + dy**2)
+
+                x2_adjusted = x2 - (dx / distance) * node_radius
+                y2_adjusted = y2 - (dy / distance) * node_radius
+                x1_adjusted = x1 + (dx / distance) * node_radius
+                y1_adjusted = y1 + (dy / distance) * node_radius
+
+                # Draw line with arrow
+                self.canva.create_line(
+                    x1_adjusted, y1_adjusted, x2_adjusted, y2_adjusted, arrow="last", fill="black"
+                )
+
+    # ==============================================================================================
+    # TESTS TAB
+    # ==============================================================================================
+    """
+        Get all test classes from the specified directory.
+        The test classes should inherit from the Test class.
+        Returns a list of test class names.
+    """
+    def get_test_classes(self):
+        test_classes = []
+        test_folder = os.path.join(os.getcwd(), self.tests_dir)
+
+        for file_name in os.listdir(test_folder):
+            if file_name.endswith(".py"):
+                file_path = os.path.join(test_folder, file_name)
+                module_name = file_name[:-3]
+
+                # Load dynamically the tests
+                spec = importlib.util.spec_from_file_location(module_name, file_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                # Search for classes that inherit from Test
+                for name, obj in inspect.getmembers(module, inspect.isclass):
+                    if issubclass(obj, Test) and obj is not Test:
+                        test_classes.append((name, obj))
+
+        return test_classes
+
+    """
+        Add a new tab for the test class.
+        The tab will contain a button to run the test and the needed arguments.
+    """
+    def add_test_tab(self, test_class_name, test_class_ref):
+        new_tab = ctk.CTkFrame(self.tab_control)
+        self.tab_control.add(new_tab, text=test_class_name)
+
+        label = ctk.CTkLabel(new_tab, text=f"Content for {test_class_name}")
+        label.pack(pady=10)
+
+        # Add a button to run the test
+        run_button = ctk.CTkButton(
+            new_tab, text="Run Test", command=lambda: self.run_test(test_class_name, test_class_ref)
+        )
+        run_button.pack(pady=10)
+
+    """
+        Runs the executable selected in the States tab and then runs the test class.
+        
+        Atributes:
+            test_class_name (str): Name of the test class to run.
+            test_class_ref (class): Reference to the test class to run.
+    """
+    def run_test(self, test_class_name, test_class_ref):
+        if not self.selected_executable:
+            print("No executable selected. Please select an executable first in States menu.")
+            return
+
+        """
+            Execute the selected executable in a secondary thread and notify the main thread to run the test.
+        """
+        def execute_and_notify():
+            try:
+                print(f"Executing {self.selected_executable} in secondary thread")
+                subprocess.Popen([self.selected_executable])
+            except FileNotFoundError:
+                print(f"Executable not found: {self.selected_executable}")
+                return
+            self.after(self.delay_ms_executable, run_test_in_main_thread)
+
+        """
+            Run the test in the main thread after a delay to ensure the executable is running.
+        """
+        def run_test_in_main_thread():
+            print(f"Running test: {test_class_name}")
+            test_instance = test_class_ref()
+            test_instance.run()
+
+        threading.Thread(target=execute_and_notify, daemon=True).start()
+
+    # ==============================================================================================
+    # TERMINAL TAB
+    # ==============================================================================================
+    """
+        Add a terminal tab to display console output.
+    """
+    def add_terminal_tab(self):
+        terminal_tab = ctk.CTkFrame(self.tab_control)
+        self.tab_control.add(terminal_tab, text="Terminal")
+
+        # Create a ScrolledText widget for the terminal output
+        self.terminal_output = ScrolledText(terminal_tab, wrap="word", state="disabled", height=20)
+        self.terminal_output.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Redirect stdout to the terminal output
+        sys.stdout = TextRedirector(self.terminal_output)
+
+    """
+        Restore the original stdout when the application is closed.
+    """
+    def on_close(self):
+        sys.stdout = sys.__stdout__
+        self.destroy()
+
+"""
+    Redirect stdout to a ScrolledText widget.
+"""
+class TextRedirector:
+    def __init__(self, text_widget):
+        self.text_widget = text_widget
+
+    """
+        Write the message to the ScrolledText widget.
+    """
+    def write(self, message):
+        self.text_widget.configure(state="normal")
+        self.text_widget.insert("end", message)
+        self.text_widget.configure(state="disabled")
+        self.text_widget.see("end")
+
+    """
+        Flush the output buffer.
+    """
+    def flush(self):
+        pass
