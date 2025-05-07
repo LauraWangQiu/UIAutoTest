@@ -27,9 +27,11 @@ Additionally, [Python](https://www.python.org/downloads/) will be used as the sc
 
 ### Other aspects
 
-> [!NOTE] All the images must have sufficient quality to be clicked and displayed in the executable large enough.
+> [!NOTE]
+> All the images must have sufficient quality to be clicked and displayed in the executable large enough.
 
-> [!NOTE] Screen resolution must be on 100% without scaling.
+> [!NOTE]
+> Screen resolution must be on 100% without scaling.
 
 ### Download Sikulix API and Jython
 
