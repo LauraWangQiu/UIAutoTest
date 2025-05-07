@@ -15,9 +15,8 @@ class SelfLoopTest(Test):
     def on_graph_step(self, element):
         print(f"Element: {element}")
 
-        for node in self.graph.nodes:
-            for transition in node.transitions:
-                if transition.destination is node:      #If the destination is the same node
-                    print("SelfLoop in node: {node.name}")   
-                    self.selfLoopList(node)
-                    break
+        for transition in element.transitions:
+            if transition.destination is element:      #If the destination is the same node
+                print("SelfLoop in node: {element.name}")   
+                self.selfLoopList(element)
+                break
