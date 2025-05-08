@@ -1,15 +1,15 @@
 import os
 import sys
 import math
-import subprocess
-import threading
 import inspect
 import importlib.util
 import customtkinter as ctk
 import tkinter.ttk as ttk
 from tkinter import filedialog
 from tkinter.scrolledtext import ScrolledText
+from tkinter import messagebox
 from pathlib import Path
+from src.generateGraph import GenerateGraph
 from src.test import Test
 from src.graphsDef import Graph
 from src.graphsDef import Transition
@@ -87,6 +87,7 @@ class App(ctk.CTk):
         # Left panel
         self.left_panel = ctk.CTkFrame(self.split_frame)
         self.left_panel.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.left_panel.grid_rowconfigure(4, weight=1)
         self.left_panel.grid_columnconfigure(0, weight=1)
         # Left panel: title
         title_label = ctk.CTkLabel(self.left_panel, text="States Configuration", font=ctk.CTkFont(size=16, weight="bold"))
@@ -97,11 +98,18 @@ class App(ctk.CTk):
         # Left panel: button to remove nodes
         remove_node_button = ctk.CTkButton(self.left_panel, text="Remove Selected State/s", command=self.remove_selected_nodes)
         remove_node_button.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+        # Left panel: Clear button
+        clear_button = ctk.CTkButton(
+            self.left_panel,
+            text="Clear",
+            command=self.clear_graph_with_confirmation
+        )
+        clear_button.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: subpanel to show all existing nodes with scrollbar
         self.nodes_canvas = ctk.CTkCanvas(self.left_panel, bg="#2b2b2b", highlightthickness=0)
-        self.nodes_canvas.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
+        self.nodes_canvas.grid(row=4, column=0, padx=10, pady=10, sticky="nsew")
         self.nodes_scrollbar = ctk.CTkScrollbar(self.left_panel, orientation="vertical", command=self.nodes_canvas.yview)
-        self.nodes_scrollbar.grid(row=3, column=1, sticky="ns", padx=(0, 10))
+        self.nodes_scrollbar.grid(row=4, column=1, sticky="ns", padx=(0, 10))
         self.nodes_canvas.configure(yscrollcommand=self.nodes_scrollbar.set)
         self.nodes_frame = ctk.CTkFrame(self.nodes_canvas)
         self.nodes_frame_id = self.nodes_canvas.create_window((0, 0), window=self.nodes_frame, anchor="nw")
@@ -110,6 +118,8 @@ class App(ctk.CTk):
             "<Configure>",
             lambda e: self.nodes_canvas.itemconfig(self.nodes_frame_id, width=self.nodes_canvas.winfo_width())
         )
+        self.nodes_frame.bind("<Configure>", self.update_scroll_region)
+        self.nodes_canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
         self.nodes_canvas.grid_remove()
         self.nodes_scrollbar.grid_remove()
 
@@ -198,20 +208,21 @@ class App(ctk.CTk):
     """
     def add_node(self):
         node_name = f"State {self.node_frames_index}"
-        new_node = self.graph.add_node(node_name, Path("imgs/image.png"))
-        print(f"Added node: {node_name}")
+        new_node = self.graph.add_node(node_name)
+        print(f"Added node: {node_name}.")
         self.create_node_frame(new_node, self.node_frames_index)
         self.node_frames_index += 1
         self.draw_graph()
 
-        if len(self.graph.nodes) > 0:
-            self.nodes_canvas.grid()
-            self.nodes_scrollbar.grid()
+        self.nodes_canvas.grid()
+        self.nodes_scrollbar.grid()
 
         for node in self.graph.nodes:
             if hasattr(node, "add_transition_menu"):
                 available_nodes = [n.name for n in self.graph.nodes if n != node]
                 node.add_transition_menu.configure(values=available_nodes)
+
+        self.update_scroll_region()
 
     """
         Make the label editable by replacing it with an entry field.
@@ -255,8 +266,6 @@ class App(ctk.CTk):
                 else:
                     edit_frame.pack(fill="x", padx=5, pady=5)
                     toggle_button.configure(text="▲")
-            else:
-                edit_frame.pack_forget()
 
     """
         Update the name of a node in the graph and redraw the graph.
@@ -342,7 +351,8 @@ class App(ctk.CTk):
             print("Please select a transition from the current menu before adding a new one.")
             return
 
-        available_nodes = [n.name for n in self.graph.nodes if n != node]
+        # Permitir que el nodo actual sea una opción para autoaristas
+        available_nodes = [n.name for n in self.graph.nodes]
         if not available_nodes:
             print("No available nodes to connect.")
             return
@@ -444,21 +454,40 @@ class App(ctk.CTk):
         self.draw_graph()
 
     """
-        Select an executable file using a file dialog and update the entry field with the selected path.
+        Clear the entire graph and all nodes.
     """
-    def select_executable(self):
-        file_path = filedialog.askopenfilename(
-            title="Select Executable",
-            filetypes=[("Executables", "*.exe"), ("All Files", "*.*")]
+    def clear_graph_with_confirmation(self):
+        confirm = messagebox.askyesno(
+            title="Confirm Deletion",
+            message="Are you sure you want to delete the entire graph? This action cannot be undone."
         )
-        if file_path:
-            self.selected_executable = file_path
-            print(f"Selected executable: {self.selected_executable}")
+        if confirm:
+            self.graph.clear()
 
-            self.executable_entry.configure(state="normal")
-            self.executable_entry.delete(0, "end")
-            self.executable_entry.insert(0, self.selected_executable)
-            self.executable_entry.configure(state="readonly")
+            for frame, edit_frame in self.node_frames:
+                frame.destroy()
+                if edit_frame:
+                    edit_frame.destroy()
+            self.node_frames.clear()
+
+            self.nodes_canvas.grid_remove()
+            self.nodes_scrollbar.grid_remove()
+
+            self.node_frames_index = 1
+
+            self.draw_graph()
+
+    """
+        Handle mouse wheel scrolling for the canvas.
+    """
+    def update_scroll_region(self, event=None):
+        self.nodes_canvas.configure(scrollregion=self.nodes_canvas.bbox("all"))
+
+    """
+        Handle mouse wheel scrolling for the canvas.    
+    """
+    def on_mouse_wheel(self, event):
+        self.nodes_canvas.yview_scroll(-1 * (event.delta // 120), "units")
 
     # ==============================================================================================
     # RIGHT PANEL
@@ -478,18 +507,18 @@ class App(ctk.CTk):
         node_positions = {}
         width = self.canva.winfo_width() or 600
         height = self.canva.winfo_height() or 400
-
+    
         num_nodes = len(self.graph.nodes)
         center_x = width // 2
         center_y = height // 2
         radius = min(width, height) // 2  
-
+    
         for i, node in enumerate(self.graph.nodes):
             angle = (2 * math.pi / num_nodes) * i
             x = center_x + int(radius * 0.8 * math.cos(angle))
             y = center_y + int(radius * 0.8 * math.sin(angle))
             node_positions[node] = (x, y)
-
+    
         # Draw nodes
         node_radius = 20
         for node, (x, y) in node_positions.items():
@@ -498,27 +527,49 @@ class App(ctk.CTk):
                 fill="lightblue", outline="black", width=2, tags=node.name
             )
             self.canva.create_text(x, y, text=node.name, font=("Arial", 12), tags=node.name)
-
+    
         # Draw transitions
         for node in self.graph.nodes:
             x1, y1 = node_positions[node]
+            transition_count = {}
+    
             for transition in node.transitions:
                 x2, y2 = node_positions[transition.destination]
-
-                # Line angle
-                dx = x2 - x1
-                dy = y2 - y1
-                distance = math.sqrt(dx**2 + dy**2)
-
-                x2_adjusted = x2 - (dx / distance) * node_radius
-                y2_adjusted = y2 - (dy / distance) * node_radius
-                x1_adjusted = x1 + (dx / distance) * node_radius
-                y1_adjusted = y1 + (dy / distance) * node_radius
-
-                # Draw line with arrow
-                self.canva.create_line(
-                    x1_adjusted, y1_adjusted, x2_adjusted, y2_adjusted, arrow="last", fill="black"
-                )
+    
+                # Count the number of transitions between the same pair of nodes
+                key = (node, transition.destination)
+                if key not in transition_count:
+                    transition_count[key] = 0
+                transition_count[key] += 1
+    
+                # Offset for multiple edges
+                offset = transition_count[key] * 10  # Adjust the offset as needed
+    
+                # Adjust positions for multiple edges
+                if node == transition.destination:  # Self-loop
+                    self.canva.create_arc(
+                        x1 - node_radius - offset, y1 - node_radius - offset,
+                        x1 + node_radius + offset, y1 + node_radius + offset,
+                        start=0, extent=300, style="arc", outline="black", width=2
+                    )
+                else:
+                    dx = x2 - x1
+                    dy = y2 - y1
+                    distance = math.sqrt(dx**2 + dy**2)
+    
+                    # Perpendicular offset for multiple edges
+                    perp_dx = -dy / distance * offset
+                    perp_dy = dx / distance * offset
+    
+                    x1_adjusted = x1 + (dx / distance) * node_radius + perp_dx
+                    y1_adjusted = y1 + (dy / distance) * node_radius + perp_dy
+                    x2_adjusted = x2 - (dx / distance) * node_radius + perp_dx
+                    y2_adjusted = y2 - (dy / distance) * node_radius + perp_dy
+    
+                    # Draw line with arrow
+                    self.canva.create_line(
+                        x1_adjusted, y1_adjusted, x2_adjusted, y2_adjusted, arrow="last", fill="black"
+                    )
 
     # ==============================================================================================
     # TESTS TAB
@@ -586,6 +637,23 @@ class App(ctk.CTk):
     # ==============================================================================================
     # TESTS RUNNER & COMPARISON TAB
     # ==============================================================================================
+    """
+        Select an executable file using a file dialog and update the entry field with the selected path.
+    """
+    def select_executable(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Executable",
+            filetypes=[("Executables", "*.exe"), ("All Files", "*.*")]
+        )
+        if file_path:
+            self.selected_executable = file_path
+            print(f"Selected executable: {self.selected_executable}")
+
+            self.executable_entry.configure(state="normal")
+            self.executable_entry.delete(0, "end")
+            self.executable_entry.insert(0, self.selected_executable)
+            self.executable_entry.configure(state="readonly")
+
     """
         Select tests to run and compare results.
     """
@@ -655,9 +723,15 @@ class App(ctk.CTk):
             print("No tests selected.")
             return
         
+        generate_graph = GenerateGraph(selected_executable=self.selected_executable)
+        generate_graph.generate_graph()
+        graph = generate_graph.get_graph()
+
+        # At this point, the graph is generated and can be passed to the tests
         for test_class_ref in selected_tests:
-            test_instance = test_class_ref(self.selected_executable)
+            test_instance = test_class_ref(graph)
             test_instance.run()
+            # TODO: Do something with the tests results
 
     """
         Compare the generated graph with specified graph.

@@ -9,29 +9,38 @@ from pathlib import Path
         transitions (list): List of transitions to change state
 """
 class Node:
-    def __init__(self, name:str, image:Path):
+    def __init__(self, name:str):
         self.name = name
-        self.image = image
+        self.image = None
         self.transitions = []
 
+    def set_image(self, image_path: str):
+        if Path(image_path).exists():
+            self.image = Path(image_path)
+            print(f"Image set to '{image_path}' for node '{self.name}'.")
+        else:
+            print(f"Error: Image path '{image_path}' does not exist.")
+
     def add_transition(self, transition):
-        for t in self.transitions:
-            if t.destination == transition.destination and t.condition.__code__.co_code == transition.condition.__code__.co_code:
-                print(f"Transition to {t.destination.name} already exists.")
-                return
+        print(f"Adding transition from '{self.name}' to '{transition.destination.name}'.")
         self.transitions.append(transition)
 
     """
         Removes the transition to a node
     """
     def remove_transition(self, _node):
-        self.transitions = [t for t in self.transitions if t.destination != _node]
-
+        for i, t in enumerate(self.transitions):
+            if t.destination == _node:
+                # Remove only the first occurrence
+                print(f"Removing transition from '{self.name}' to '{_node.name}'.")
+                del self.transitions[i]
+                break
+        
     """
-        Updates the name of the node.
+        Updates the name of the node
     """
     def update_name(self, new_name: str):
-        print(f"Changing node name from '{self.name}' to '{new_name}'")
+        print(f"Changing node name from '{self.name}' to '{new_name}'.")
         self.name = new_name
 
 """
@@ -69,12 +78,12 @@ class Graph:
         Adds a node to the graph
         Returns new node
     """
-    def add_node(self, name:str, image:Path) ->Node:
+    def add_node(self, name:str) -> Node:
         for node in self.nodes:
             if node.name == name:
                 print(f"Node with name '{name}' already exists.")
                 return None  
-        n = Node(name, image)
+        n = Node(name)
         self.nodes.append(n)
         return n
     
@@ -84,15 +93,15 @@ class Graph:
     """
     def remove_node(self, node:Node) -> bool:
         if node not in self.nodes:
-            print(f"Node {node.name} is not in graph")
+            print(f"Node {node.name} is not in graph.")
             return False
-        
+
         self.nodes.remove(node)
 
-        for node in self.nodes:
-            node.transitions = [t for t in node.transitions if t.destination is not node]
-        
-        print(f"Node '{node.name}' has been removed")
+        for other_node in self.nodes:
+            other_node.transitions = [t for t in other_node.transitions if t.destination is not node]
+
+        print(f"Node '{node.name}' has been removed.")
         return True
 
     """
@@ -101,7 +110,10 @@ class Graph:
     """
     def add_transition(self, origin, destination, condition=None):
         if origin not in self.nodes or destination not in self.nodes:
-            print("Origin or destination node is not in the graph.")
+            if origin not in self.nodes:
+                print(f"Origin node '{origin.name}' is not in the graph.")
+            if destination not in self.nodes:
+                print(f"Destination node '{destination.name}' is not in the graph.")
             return
 
         condition = condition if condition is not None else lambda: True
@@ -124,57 +136,6 @@ class Graph:
         return True
 
     """
-        Depth First Search (DFS) algorithm to traverse the graph.
-        It starts from the start node and visits all reachable nodes.
-        Returns a set of visited nodes.
-    """
-    def dfs(self, actual:Node = None, visited:set = None) -> set:
-        if visited is None:
-            visited = set()
-        if actual is None:
-            actual = self.startNode
-            
-        if actual in visited:
-            return visited
-        print(f"visiting node: {actual.name}")
-        visited.add(actual)
-        for transition in actual.transitions:
-            if transition.is_valid():
-                self.dfs(transition.destination, visited)
-        
-        return visited
-    
-    """
-        A* algorithm to find the shortest path from source to destination node.
-        It uses a cost parameter to determine the cost of the path.
-        Returns the shortest path as a set of nodes.
-    """
-    def a_star(self, cost: int, src: Node, dst: Node, actual: Node = None, path: set = None) -> set:
-        if src == dst:
-            print("Source node and destination node are the same.")
-            return path
-        if path == None:
-            path = set()
-        if actual == None:
-            actual = src
-        if actual == dst:
-            path.add(actual)
-            return path
-        
-        path.add(actual)
-        paths = []
-        for transition in actual.transitions:
-            if transition.is_valid():   
-                neighbor = transition.destination
-                if neighbor not in path:
-                    aux_path = self.a_star(cost + 1, src, dst, neighbor, path.copy())
-                    if aux_path is not None and dst in aux_path:
-                        paths.append(aux_path)
-        
-        if paths:
-            return min(paths, key = len)
-    
-    """
         Updates the name of a node and ensures all transitions pointing to it remain valid.
     """
     def update_node_name(self, node: Node, new_name: str):
@@ -182,33 +143,13 @@ class Graph:
             print(f"Node '{node.name}' is not in the graph.")
             return False
         node.update_name(new_name)
-        print(f"Node name updated to '{new_name}'")
+        print(f"Node name updated to '{new_name}'.")
         return True
 
-# --------------------
-# Example of use
-# --------------------
-
-# g = Graph()
-# n1 = g.add_node("1", Path("imgs/image.png"))
-# n2 = g.add_node("2", Path("imgs/image.png"))
-# n3 = g.add_node("3", Path("imgs/image.png"))
-# n4 = g.add_node("4", Path("imgs/image.png"))
-# n5 = g.add_node("5", Path("imgs/image.png"))
-
-# g.set_start_node(n1)
-# g.add_transition(n1,n2)
-# g.add_transition(n1,n3)
-# g.add_transition(n3,n4)
-# g.add_transition(n3,n5)
-
-# g.dfs(n3)
-# --->  Had visitted:   3, 4, 5
-
-# g.remove_node(n3)
-
-# visit = g.dfs()
-# --->  Had visitted:   1, 2
-
-# print([v.name for v in visit])
-# --->  Prints:         ['1', '2']
+    """
+        Clears the graph by removing all nodes and transitions.
+    """
+    def clear(self):
+        self.nodes.clear()
+        self.startNode = None
+        print("Graph cleared.")

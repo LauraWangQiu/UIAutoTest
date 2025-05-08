@@ -1,14 +1,14 @@
 from src.test import Test
 
 class PrimePathCovTest(Test):
-    def __init__(self, selected_executable=None):
-        super().__init__("PPC Test", selected_executable)
+    def __init__(self, graph=None):
+        super().__init__("PPC Test")
+        self.graph = graph
         # Variables and modifiable parameters
 
+    """
+        Overrides the parent run method
+    """
     def run(self):
-        super().run()
-        # ...
-
-    def on_graph_step(self, element):
-        print(f"Element: {element}")
-        # ...
+        print("Running " + self.name + ".")
+        # Do something with the generated graph
