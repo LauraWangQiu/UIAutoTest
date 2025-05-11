@@ -14,9 +14,10 @@ v C unity.png
 
 # Directed edges section
 # Each edge is declared as:
-#   e <SOURCE_NAME> <TARGET_NAME> <IMAGE_PATH>
+#   e <ACTION_NAME> <SOURCE_NAME> <TARGET_NAME> <IMAGE_PATH>
+#    • ACTION_NAME: action that should be done 
 #    • IMAGE_PATH: image path of the button. Relative path to the vertex’s PNG file
 
 e CLICK A B imagen2.png
 e CLICK B A boton3.png
-e CLICK_AND_TYPE Unity A C image3.png
+e CLICK_AND_TYPE A C image3.png Unity 

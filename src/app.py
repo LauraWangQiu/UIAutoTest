@@ -13,39 +13,62 @@ from src.generateGraph import GenerateGraph
 from src.test import Test
 from src.graphsDef import Graph
 from src.graphsDef import Transition
-
+import src.GraphIO as _graph_io_module
+GraphIO = _graph_io_module.GraphIO
 class App(ctk.CTk):  
-    def __init__(self, window_name="UI Auto Test", window_size="800x600", tests_directory="tests"):
-        super().__init__()
-        
+    def __init__(self, window_name="UI Auto Test", window_size="800x600", tests_directory="tests", headless=False):
+        """
+        Constructor for the App class
+
+        Args:
+            window_name (str): The title of the application window
+            window_size (str): The size of the application window (e.g., "800x600")
+            tests_directory (str): The directory where test files are located
+            headless (bool): Whether the application is running in headless mode
+        """
+       
+        self.headless = headless  # Store the headless mode flag
         self.selected_executable = None
+        self.graph = Graph()  # Graph provided by the user
         self.tests_dir = tests_directory
 
-        self.title(window_name)
-        self.geometry(window_size)
+        if self.headless:
+            print("[INFO] Application initialized in headless mode")
+            self.load_graph_from_file("graph.txt")
+        else: 
+            super().__init__()
+            self.title(window_name)
+            self.geometry(window_size)
+            self.configure_grid()
+            self.selected_nodes = []
+            self.node_frames = []
+            self.node_frames_index = 1
+            self.delay_ms_tabs = 100
+            self.delay_ms_executable = 1000
+            self.after(self.delay_ms_tabs, self.create_tabs)
 
-        self.configure_grid()
+    def load_graph_from_file(self, file_name):
+        try:
+            print(f"[INFO] Loading graph from {file_name} using GraphIO...")
+            graph_io = GraphIO()        
+            self.graph = graph_io.load_graph(file_name, "imgs")
+            print("[INFO] Graph successfully loaded")
+            #graph_io.write_graph("mi_graph.txt", self.graph)
+        except FileNotFoundError:
+            print(f"[ERROR] File {file_name} not found")
+        except Exception as e:
+            print(f"[ERROR] An error occurred while loading the graph: {e}")
 
-        self.graph = Graph()
-        self.selected_nodes = []
-        self.node_frames = []
-        self.node_frames_index = 1
-
-        self.delay_ms_tabs = 100
-        self.delay_ms_executable = 1000
-
-        self.after(self.delay_ms_tabs, self.create_tabs)
-    
     """
-        Configure the grid layout of the main window.
+        Configure the grid layout of the main window
     """
     def configure_grid(self):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
    
     """
-        Create the tabs: States and Tests.
-        The Tests tab is created dynamically based on the test classes found in the specified directory.
+        Create the tabs: States and Tests
+        The Tests tab is created dynamically based on the test classes found in the specified directory
     """
     def create_tabs(self):
         style = ttk.Style()
@@ -72,7 +95,7 @@ class App(ctk.CTk):
         self.add_terminal_tab()
 
     """
-        Configure the States tab layout.
+        Configure the States tab layout
     """
     def configure_states_tab(self):
         self.states_tab.grid_columnconfigure(0, weight=1)
@@ -139,11 +162,11 @@ class App(ctk.CTk):
     # LEFT PANEL
     # ==============================================================================================
     """
-        Create a frame for each node in the graph.
+        Create a frame for each node in the graph
 
         Atributes:
-            node (Node): The node to create the frame for.
-            index (int): The index of the node in the graph.
+            node (Node): The node to create the frame for
+            index (int): The index of the node in the graph
     """
     def create_node_frame(self, node, index):
         frame = ctk.CTkFrame(self.nodes_frame, corner_radius=10)
@@ -159,11 +182,11 @@ class App(ctk.CTk):
             if node.checkbox_var.get():
                 if node not in self.selected_nodes:
                     self.selected_nodes.append(node)
-                    print(f"Node {node.name} added to selected_nodes.")
+                    print(f"Node {node.name} added to selected_nodes")
             else:
                 if node in self.selected_nodes:
                     self.selected_nodes.remove(node)
-                    print(f"Node {node.name} removed from selected_nodes.")
+                    print(f"Node {node.name} removed from selected_nodes")
 
         checkbox = ctk.CTkCheckBox(header_frame, variable=node.checkbox_var, text="", command=on_checkbox_change)
         checkbox.pack(side="left", padx=5)
@@ -204,7 +227,7 @@ class App(ctk.CTk):
         self.update_transitions_list(node)
 
     """
-        Add a new node to the graph and create its corresponding UI elements.
+        Add a new node to the graph and create its corresponding UI elements
     """
     def add_node(self):
         node_name = f"State {self.node_frames_index}"
@@ -225,9 +248,9 @@ class App(ctk.CTk):
         self.update_scroll_region()
 
     """
-        Make the label editable by replacing it with an entry field.
-        When the user presses Enter or clicks outside the entry, the new text is saved and the label is updated.
-        The entry field is destroyed after saving the text.
+        Make the label editable by replacing it with an entry field
+        When the user presses Enter or clicks outside the entry, the new text is saved and the label is updated
+        The entry field is destroyed after saving the text
     """
     def make_label_editable(self, label, node):
         current_text = label.cget("text")
@@ -251,11 +274,11 @@ class App(ctk.CTk):
         entry.focus_set()
 
     """
-        Toggle the visibility of the node frame and update the button text accordingly.
+        Toggle the visibility of the node frame and update the button text accordingly
 
         Atributes:
             frame (CTkFrame): The frame to toggle.
-            toggle_button (CTkButton): The button that toggles the frame visibility.
+            toggle_button (CTkButton): The button that toggles the frame visibility
     """
     def toggle_node_frame(self, frame, toggle_button):
         for f, edit_frame in self.node_frames:
@@ -268,24 +291,24 @@ class App(ctk.CTk):
                     toggle_button.configure(text="▲")
 
     """
-        Update the name of a node in the graph and redraw the graph.
+        Update the name of a node in the graph and redraw the graph
 
         Atributes:
-            node (Node): The node to update.
-            new_name (str): The new name for the node.
-        If the new name is empty, it does not update the node name.
+            node (Node): The node to update
+            new_name (str): The new name for the node
+        If the new name is empty, it does not update the node name
     """
     def update_node_name(self, node, new_name):
         if self.graph.update_node_name(node, new_name):
             self.draw_graph()
 
     """
-        Move a transition up in the list of transitions for a given node.
-        This function swaps the transition with the one above it in the list.
+        Move a transition up in the list of transitions for a given node
+        This function swaps the transition with the one above it in the list
 
         Atributes:
-            node (Node): The node whose transition list needs to be updated.
-            index (int): The index of the transition to move up.
+            node (Node): The node whose transition list needs to be updated
+            index (int): The index of the transition to move up
     """
     def move_transition_up(self, node, index):
         if index > 0:
@@ -294,12 +317,12 @@ class App(ctk.CTk):
             self.draw_graph()
 
     """
-        Move a transition down in the list of transitions for a given node.
-        This function swaps the transition with the one below it in the list.
+        Move a transition down in the list of transitions for a given node
+        This function swaps the transition with the one below it in the list
         
         Atributes:
-            node (Node): The node whose transition list needs to be updated.
-            index (int): The index of the transition to move down.
+            node (Node): The node whose transition list needs to be updated
+            index (int): The index of the transition to move down
     """
     def move_transition_down(self, node, index):
         if index < len(node.transitions) - 1:
@@ -308,10 +331,10 @@ class App(ctk.CTk):
             self.draw_graph()
 
     """
-        Update the transitions list for a given node.
+        Update the transitions list for a given node
 
         Atributes:
-            node (Node): The node whose transitions list needs to be updated.
+            node (Node): The node whose transitions list needs to be updated
     """
     def update_transitions_list(self, node):
         for widget in node.transitions_list_frame.winfo_children():
@@ -339,22 +362,22 @@ class App(ctk.CTk):
                 move_down_button.pack(side="right", padx=2)
 
     """
-        Add a connection to a node by creating a dropdown menu with available nodes.
-        The user can select a node from the menu to create a transition.
-        If the node already has a menu, it prompts the user to select a transition from the current menu before adding a new one.
+        Add a connection to a node by creating a dropdown menu with available nodes
+        The user can select a node from the menu to create a transition
+        If the node already has a menu, it prompts the user to select a transition from the current menu before adding a new one
 
         Atributes:
-            node (Node): The node to which the transition is being added.
+            node (Node): The node to which the transition is being added
     """
     def add_connection(self, node):
         if hasattr(node, "add_transition_menu"):
-            print("Please select a transition from the current menu before adding a new one.")
+            print("Please select a transition from the current menu before adding a new one")
             return
 
-        # Permitir que el nodo actual sea una opción para autoaristas
+        
         available_nodes = [n.name for n in self.graph.nodes]
         if not available_nodes:
-            print("No available nodes to connect.")
+            print("No available nodes to connect")
             return
 
         node.transitions_list_frame.grid()
@@ -369,13 +392,13 @@ class App(ctk.CTk):
         node.add_transition_menu = add_transition_menu
 
     """
-        Add a connection to a node by creating a transition to the selected node.
-        This function is called when the user selects a node from the dropdown menu.
+        Add a connection to a node by creating a transition to the selected node
+        This function is called when the user selects a node from the dropdown menu
 
         Atributes:
-            node (Node): The node to which the transition is being added.
-            selected_name (str): The name of the selected node from the dropdown menu.
-        If the selected node already has a transition to the current node, it does not add it again.
+            node (Node): The node to which the transition is being added
+            selected_name (str): The name of the selected node from the dropdown menu
+        If the selected node already has a transition to the current node, it does not add it again
     """
     def add_connection_to_node(self, node, selected_name):
         for n in self.graph.nodes:
@@ -392,10 +415,10 @@ class App(ctk.CTk):
         self.draw_graph()
 
     """
-        Delete the last transition from the list of transitions for a given node.
-        If the node has no transitions left, the transitions list frame is hidden.
-        If the node has an add transition menu, it is destroyed.
-        If the node has transitions, it deletes the last one and updates the transitions list.
+        Delete the last transition from the list of transitions for a given node
+        If the node has no transitions left, the transitions list frame is hidden
+        If the node has an add transition menu, it is destroyed
+        If the node has transitions, it deletes the last one and updates the transitions list
     """
     def delete_last_transition(self, node):
         if hasattr(node, "add_transition_menu"):
@@ -417,13 +440,13 @@ class App(ctk.CTk):
         self.draw_graph()
 
     """
-        Remove the selected nodes from the graph and update the graph.
+        Remove the selected nodes from the graph and update the graph
     """
     def remove_selected_nodes(self):
         nodes_to_remove = [node for node in self.graph.nodes if getattr(node, "checkbox_var", None) and node.checkbox_var.get()]
         
         if not nodes_to_remove:
-            print("No states selected for removal.")
+            print("No states selected for removal")
             return
 
         for node in nodes_to_remove:
@@ -454,12 +477,12 @@ class App(ctk.CTk):
         self.draw_graph()
 
     """
-        Clear the entire graph and all nodes.
+        Clear the entire graph and all nodes
     """
     def clear_graph_with_confirmation(self):
         confirm = messagebox.askyesno(
             title="Confirm Deletion",
-            message="Are you sure you want to delete the entire graph? This action cannot be undone."
+            message="Are you sure you want to delete the entire graph? This action cannot be undone"
         )
         if confirm:
             self.graph.clear()
@@ -478,13 +501,13 @@ class App(ctk.CTk):
             self.draw_graph()
 
     """
-        Handle mouse wheel scrolling for the canvas.
+        Handle mouse wheel scrolling for the canvas
     """
     def update_scroll_region(self, event=None):
         self.nodes_canvas.configure(scrollregion=self.nodes_canvas.bbox("all"))
 
     """
-        Handle mouse wheel scrolling for the canvas.    
+        Handle mouse wheel scrolling for the canvas
     """
     def on_mouse_wheel(self, event):
         self.nodes_canvas.yview_scroll(-1 * (event.delta // 120), "units")
@@ -493,14 +516,14 @@ class App(ctk.CTk):
     # RIGHT PANEL
     # ==============================================================================================
     """
-        Handle the canvas resize event to redraw the graph.
+        Handle the canvas resize event to redraw the graph
     """
     def on_canvas_resize(self, event):
         self.draw_graph()
 
     """
-        Draw the graph on the canvas.
-        This function calculates the positions of the nodes and draws them along with the transitions.
+        Draw the graph on the canvas
+        This function calculates the positions of the nodes and draws them along with the transitions
     """
     def draw_graph(self):
         self.canva.delete("all")
@@ -575,9 +598,9 @@ class App(ctk.CTk):
     # TESTS TAB
     # ==============================================================================================
     """
-        Get all test classes from the specified directory.
-        The test classes should inherit from the Test class.
-        Returns a list of test class names.
+        Get all test classes from the specified directory
+        The test classes should inherit from the Test class
+        Returns a list of test class names
     """
     def get_test_classes(self):
         test_classes = []
@@ -601,8 +624,8 @@ class App(ctk.CTk):
         return test_classes
 
     """
-        Add a new tab for the test class.
-        The tab will contain a button to run the test and the needed arguments.
+        Add a new tab for the test class
+        The tab will contain a button to run the test and the needed arguments
     """
     def add_test_tab(self, test_class_name, test_class_ref):
         test_instance = test_class_ref()
@@ -638,7 +661,7 @@ class App(ctk.CTk):
     # TESTS RUNNER & COMPARISON TAB
     # ==============================================================================================
     """
-        Select an executable file using a file dialog and update the entry field with the selected path.
+        Select an executable file using a file dialog and update the entry field with the selected path
     """
     def select_executable(self):
         file_path = filedialog.askopenfilename(
@@ -655,7 +678,7 @@ class App(ctk.CTk):
             self.executable_entry.configure(state="readonly")
 
     """
-        Select tests to run and compare results.
+        Select tests to run and compare results
     """
     def add_test_runner_tab(self):
         test_runner_tab = ctk.CTkFrame(self.tab_control)
@@ -690,8 +713,8 @@ class App(ctk.CTk):
         compare_button.pack(pady=10)
 
     """
-        Populate the test list with checkboxes for each test class found in the specified directory.
-        Each checkbox is associated with a test class reference.
+        Populate the test list with checkboxes for each test class found in the specified directory
+        Each checkbox is associated with a test class reference
     """
     def populate_test_list(self):
         for widget in self.test_list_frame.winfo_children():
@@ -712,7 +735,7 @@ class App(ctk.CTk):
     """
     def run_tests(self):
         if not self.selected_executable:
-            print("No executable selected. Please select an executable first.")
+            print("No executable selected. Please select an executable first")
             return
 
         selected_tests = [
@@ -720,7 +743,7 @@ class App(ctk.CTk):
         ]
 
         if not selected_tests:
-            print("No tests selected.")
+            print("No tests selected")
             return
         
         generate_graph = GenerateGraph(selected_executable=self.selected_executable)
@@ -734,7 +757,7 @@ class App(ctk.CTk):
             # TODO: Do something with the tests results
 
     """
-        Compare the generated graph with specified graph.
+        Compare the generated graph with specified graph
     """
     def compare(self):
         # TODO: Get the file generated and the expected graph and compare them
@@ -759,21 +782,21 @@ class App(ctk.CTk):
         sys.stdout = self.TextRedirector(self.terminal_output)
 
     """
-        Restore the original stdout when the application is closed.
+        Restore the original stdout when the application is closed
     """
     def on_close(self):
         sys.stdout = sys.__stdout__
         self.destroy()
 
     """
-    Redirect stdout to a ScrolledText widget.
+    Redirect stdout to a ScrolledText widget
     """
     class TextRedirector:
         def __init__(self, text_widget):
             self.text_widget = text_widget
 
         """
-            Write the message to the ScrolledText widget.
+            Write the message to the ScrolledText widget
         """
         def write(self, message):
             self.text_widget.configure(state="normal")
@@ -782,7 +805,7 @@ class App(ctk.CTk):
             self.text_widget.see("end")
 
         """
-            Flush the output buffer.
+            Flush the output buffer
         """
         def flush(self):
             pass

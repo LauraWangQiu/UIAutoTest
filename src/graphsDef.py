@@ -48,12 +48,22 @@ class Node:
     
     Attributes:
         destination (Node): Destination node
-        condition (lambda): Condition to go to destination
+        condition (callable): Condition function
+        action (ActionType): Type of action (CLICK, etc.)
+        image (str): Image path for the action
+        text (str): Text for CLICK_AND_TYPE
+        drag_image (str): Drag image for DRAG_AND_DROP
+        drop_image (str): Drop image for DRAG_AND_DROP
 """
 class Transition:
-    def __init__(self, destination, condition):
+    def __init__(self, destination, condition= None):
         self.destination = destination
-        self.condition = condition
+        self.condition = condition if condition is not None else (lambda: True)
+        self.action = None
+        self.image = None
+        self.text = None
+        self.drag_image = None
+        self.drop_image = None
 
     """
         Check the condition of transition
@@ -61,7 +71,23 @@ class Transition:
     """
     def is_valid(self) -> bool:
         return self.condition()
+   
+    def update_action(self, action):
+        """Update the action type of this transition."""
+        self.action = action
 
+    def update_image(self, image_path: str):
+        """Update the image for this transition."""
+        self.image = image_path
+
+    def update_text(self, text: str):
+        """Update the text for CLICK_AND_TYPE transitions."""
+        self.text = text
+
+    def update_drag_and_drop(self, drag_image: str, drop_image: str):
+        """Update drag and drop images for this transition."""
+        self.drag_image = drag_image
+        self.drop_image = drop_image
 """
     Class Graph contains the nodes and has functions to go through them
     
@@ -108,16 +134,22 @@ class Graph:
         Adds a transition to the graph
         Returns False if the origin or destination node is not in the graph, True otherwise
     """
-    def add_transition(self, origin, destination, condition=None):
+    def add_transition(self, origin, destination, condition=None) -> Transition:
+        """
+        Adds a transition to the graph.
+        Returns the new Transition, or None if origin/destination no están en el grafo.
+        """
         if origin not in self.nodes or destination not in self.nodes:
             if origin not in self.nodes:
                 print(f"Origin node '{origin.name}' is not in the graph.")
             if destination not in self.nodes:
                 print(f"Destination node '{destination.name}' is not in the graph.")
-            return
+            return None
 
-        condition = condition if condition is not None else lambda: True
-        origin.add_transition(Transition(destination, condition))
+        condition = condition if condition is not None else (lambda: True)
+        t = Transition(destination, condition)
+        origin.add_transition(t)
+        return t
 
     """
         Sets the start node of the graph.
