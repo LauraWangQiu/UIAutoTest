@@ -62,7 +62,7 @@ class SikulixWrapper:
         :param similarity_reduction: Amount to reduce similarity per attempt.
         :return: True if the click was successful; False otherwise.
         """
-
+        print("[INFO] Trying click on image: " + image_path)
         for attempt in range(retries):
             actual_attempt = attempt + 1
             actual_similarity = similarity - (similarity_reduction*attempt)

@@ -127,7 +127,7 @@ def click(self, images_path, node):
 
 if __name__ == "__main__":
     # Example usage
-    executable_path = "C://Users//Andrés//Documents//GitHub//UIAutoTest//bin//Cooking Bibble//Cooking Bibble.exe"
+    executable_path = "bin/Cooking Bibble/Cooking Bibble.exe"
     generator = GenerateGraph(executable_path)
     generator.generate_graph()
     graph = generator.get_graph()
