@@ -83,6 +83,10 @@ class Transition:
     def update_text(self, text: str):
         """Update the text for CLICK_AND_TYPE transitions."""
         self.text = text
+    
+    def update_destination(self, node:Node):
+        """Update the detination node"""
+        self.detination = node
 
     def update_drag_and_drop(self, drag_image: str, drop_image: str):
         """Update drag and drop images for this transition."""

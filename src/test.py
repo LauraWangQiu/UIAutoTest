@@ -16,4 +16,10 @@ class Test:
         Method to be implemented by subclasses.
     """
     def run(self):
+        pass  
+    
+    """
+        Method print to be implemented by subclasses.
+    """
+    def write_solution(self):
         pass
