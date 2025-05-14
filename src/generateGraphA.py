@@ -103,7 +103,8 @@ class GenerateGraph:
 
 if __name__ == "__main__":
     # Example usage
-    executable_path = "C://Users//Andrés//Documents//GitHub//UIAutoTest//bin//Cooking Bibble//Cooking Bibble.exe"
+    base_path = os.path.dirname(os.path.abspath(__file__))  # Obtiene el directorio actual del script
+    executable_path = os.path.join(base_path, "../bin/Cooking Bibble/Cooking Bibble.exe")  # Ruta relativa
     generator = GenerateGraph(executable_path)
     generator.generate_graph()
     graph = generator.get_graph()
