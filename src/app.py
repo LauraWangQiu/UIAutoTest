@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import sys
 import math
@@ -49,15 +50,15 @@ class App(ctk.CTk):
 
     def load_graph_from_file(self, file_name):
         try:
-            print(f"[INFO] Loading graph from {file_name} using GraphIO...")
+            print("[INFO] Loading graph from " + file_name + " using GraphIO...")
             graph_io = GraphIO()        
             self.graph = graph_io.load_graph(file_name, "imgs")
             print("[INFO] Graph successfully loaded")
             #graph_io.write_graph("mi_graph.txt", self.graph)
         except FileNotFoundError:
-            print(f"[ERROR] File {file_name} not found")
+            print("[ERROR] File " + file_name + " not found")
         except Exception as e:
-            print(f"[ERROR] An error occurred while loading the graph: {e}")
+            print("[ERROR] An error occurred while loading the graph: " + str(e))
 
     """
         Configure the grid layout of the main window
@@ -182,11 +183,11 @@ class App(ctk.CTk):
             if node.checkbox_var.get():
                 if node not in self.selected_nodes:
                     self.selected_nodes.append(node)
-                    print(f"Node {node.name} added to selected_nodes")
+                    print("[INFO] Node " + node.name + " added to selected_nodes")
             else:
                 if node in self.selected_nodes:
                     self.selected_nodes.remove(node)
-                    print(f"Node {node.name} removed from selected_nodes")
+                    print("[INFO] Node " + node.name + " removed from selected_nodes")
 
         checkbox = ctk.CTkCheckBox(header_frame, variable=node.checkbox_var, text="", command=on_checkbox_change)
         checkbox.pack(side="left", padx=5)
@@ -230,9 +231,9 @@ class App(ctk.CTk):
         Add a new node to the graph and create its corresponding UI elements
     """
     def add_node(self):
-        node_name = f"State {self.node_frames_index}"
+        node_name = "State " + str(self.node_frames_index)
         new_node = self.graph.add_node(node_name)
-        print(f"Added node: {node_name}.")
+        print("[INFO] Added node: " + node_name + ".")
         self.create_node_frame(new_node, self.node_frames_index)
         self.node_frames_index += 1
         self.draw_graph()
@@ -371,13 +372,12 @@ class App(ctk.CTk):
     """
     def add_connection(self, node):
         if hasattr(node, "add_transition_menu"):
-            print("Please select a transition from the current menu before adding a new one")
+            print("[INFO] Please select a transition from the current menu before adding a new one")
             return
 
-        
         available_nodes = [n.name for n in self.graph.nodes]
         if not available_nodes:
-            print("No available nodes to connect")
+            print("[INFO] No available nodes to connect")
             return
 
         node.transitions_list_frame.grid()
@@ -446,12 +446,12 @@ class App(ctk.CTk):
         nodes_to_remove = [node for node in self.graph.nodes if getattr(node, "checkbox_var", None) and node.checkbox_var.get()]
         
         if not nodes_to_remove:
-            print("No states selected for removal")
+            print("[INFO] No states selected for removal")
             return
 
         for node in nodes_to_remove:
             self.graph.remove_node(node)
-            print(f"Removed node: {node.name}")
+            print(f"[INFO] Removed node: {node.name}")
 
             for frame, edit_frame in self.node_frames:
                 if frame._name == str(id(node)):
@@ -735,7 +735,7 @@ class App(ctk.CTk):
     """
     def run_tests(self):
         if not self.selected_executable:
-            print("No executable selected. Please select an executable first")
+            print("[INFO] No executable selected. Please select an executable first")
             return
 
         selected_tests = [
@@ -743,7 +743,7 @@ class App(ctk.CTk):
         ]
 
         if not selected_tests:
-            print("No tests selected")
+            print("[INFO] No tests selected")
             return
         
         generate_graph = GenerateGraph(selected_executable=self.selected_executable)

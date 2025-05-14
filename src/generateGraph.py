@@ -89,7 +89,7 @@ class GenerateGraph:
                 pass
         
         if new_node is None:
-            print(f"Node in loop not found, creating new...")
+            print("Node in loop not found, creating new...")
             new_node = Node("New node")
             Graph.add_node(new_node)
             # TODO Make a screen capture of the actualscene
