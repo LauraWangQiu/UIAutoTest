@@ -19,6 +19,7 @@ class GenerateGraph:
         self.graph = Graph()
         self.node_inputs = []
         self.delay_ms = 5   # Ahora en segundos para simplificar con time.sleep
+        self.tys_main_loop=6
         self.actual_node = None
         self.start_node = None
         self.process = None
@@ -94,6 +95,7 @@ class GenerateGraph:
         
         print("[LOOP] All images: " + str(len(all_images)))
 
+        loop_trays = 0
         while not self._stop_loop.is_set(): #mientras que no se haya terminado 
             end_loop = False
             print("[LOOP] Restarting loop...")
@@ -105,9 +107,14 @@ class GenerateGraph:
                     found_node = self._process_states(self_path, visited_images)
                     if not found_node:
                         self._handle_no_node_found(self_path)
+                        loop_trays += 1
                         end_loop = True
                     if self._should_end_loop(visited_images, all_images):
                         print("[LOOP] All images visited, ending loop.")
+                        end_loop = True
+                        self._stop_loop.set()
+                    if loop_trays >= self.tys_main_loop:
+                        print("[LOOP] Loop trays exceeded, ending loop.")
                         end_loop = True
                         self._stop_loop.set()
             except Exception as e:
@@ -149,7 +156,8 @@ class GenerateGraph:
                     new_node = self.graph.get_node(image_menu)
                     print("[LOOP] New node added: " + new_node.name)
                     self.input_sikuli(os.path.join(state_path, "buttons"), new_node, visited_images)
-                    visited_images.add(state_path)  # Add the folder to the visited files.
+                    if state_path not in visited_images:
+                        visited_images.add(state_path)  # Add the folder to the visited files.
                 else:
                     # If node is already in the graph, check if it has an unused transition.
                     print("[LOOP] Node already in graph: " + image_menu)
