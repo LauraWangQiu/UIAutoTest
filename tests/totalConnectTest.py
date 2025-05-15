@@ -1,9 +1,10 @@
 from src.test import Test
 
 class TotalConnectTest(Test):
-    def __init__(self, graph = None):
-        super().__init__("TC Test")
+    def __init__(self, graph = None, graph_file = "output_graph.txt"):
+        super().__init__("TC Test", "output_graph.txt")
         self.graph = graph
+        self.graph_f = graph_file 
         # Variables and modifiable parameters:
         self.visited_nodes = set()
         self.visited_transitions = set()
@@ -21,9 +22,6 @@ class TotalConnectTest(Test):
 
     # Total Connectivity Test:
     def execute_test(self):
-        self.visited_nodes
-        self.visited_transitions
-
         self._visit_nodes(self.graph.startNode)
 
     # Visit all the nodes from node.
@@ -48,6 +46,6 @@ class TotalConnectTest(Test):
             with open(graph_file, "w") as file:
                 file.write("Total Connectivity Test:\n")
         except Exception as e:
-            print("[ERROR] Exception while writing test data from: " + self.name + ". " + str(e))
+            print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
             print("[INFO] Test data from: " + self.name + " successfully written to " + graph_file)

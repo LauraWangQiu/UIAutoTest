@@ -2,7 +2,7 @@
     This class is a base class for all tests.
 """
 class Test:
-    def __init__(self, name="Parent Test Class"):
+    def __init__(self, name="Parent Test Class", graph_file = "output_graph.txt"):
         self.name = name
         print(f"Initializing {self.name} class.")
 
@@ -21,5 +21,5 @@ class Test:
     """
         Method print to be implemented by subclasses.
     """
-    def write_solution(self, graph_file):
+    def write_solution(self):
         pass
