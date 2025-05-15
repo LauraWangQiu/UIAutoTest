@@ -23,4 +23,17 @@ class SelfLoopTest(Test):
                     break
                 else: print("Nop SelfLoop")
 
+    def write_solution(self, graph_file):
+        try:
+            with open(graph_file, "w") as file:
+                file.write("Self Loop Test:\n")
+
+                # Write the results of the test
+                for node in self.selfLoopList:
+                    file.write(F"- The node '{node.name}' has self loop edges\n")
+        except Exception as e:
+            print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
+        else:
+            print("[INFO] Test data from: " + self.name + " successfully written to " + graph_file)
+
         

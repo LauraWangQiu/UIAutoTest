@@ -25,3 +25,16 @@ class EdgePairCovTest(Test):
                     if (node.name, dest_name) not in self.EdgePairCovList:
                         self.EdgePairCovList.add((node.name, dest_name))
                         print(f"Multiple transitions ({count}) from '{node.name}' to '{dest_name}'")
+
+    def write_solution(self, graph_file):
+        try:
+            with open(graph_file, "w") as file:
+                file.write("Edge Pair Cov Test:\n")
+
+                # Write the results of the test
+                for origin, dest in self.EdgePairCovList:
+                    file.write(F"- From '{origin}' to '{dest}' has multiple transitions\n")
+        except Exception as e:
+            print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
+        else:
+            print("[INFO] Test data from: " + self.name + " successfully written to " + graph_file)
