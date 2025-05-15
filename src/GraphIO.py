@@ -153,7 +153,7 @@ class GraphIO:
         try:
             with open(graph_file, "w") as f:
                 edge_lines = []
-                # Recorres nodos y escribes solo los vértices, pero acumulas edges
+                # Iterate nodes and write only the vertices, but accumulate edges
                 for node in graph.nodes:
                     image_name = node.image.split("imgs\\", 1)[1]
                     f.write("v " + node.name + " " + image_name + "\n")
@@ -177,7 +177,7 @@ class GraphIO:
 
                         else:
                             edge_lines.append("e " + act + " " + node.name + " " + dst + "\n")
-                # Escribes todas las aristas al final
+                # Write all edges at the end
                 f.writelines(edge_lines)
         except Exception as e:
             print("[ERROR] Exception while writing the graph: " + str(e))

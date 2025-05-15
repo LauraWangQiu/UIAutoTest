@@ -205,18 +205,16 @@ class App(ctk.CTk):
         file_path = filedialog.asksaveasfilename(
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
-            title="Guardar grafo en archivo"
+            title="Save graph to file"
         )
         if file_path:
-           
             self.graph_io.write_graph(file_path, self.graph)
-           
 
     def load_graph_from_dialog(self):
         file_path = filedialog.askopenfilename(
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
-            title="Read graph from file"
+            title="Load graph from file"
         )
         if file_path:
             self.clear_graph()
