@@ -18,14 +18,14 @@ class TotalConnectTest(Test):
         self.visited_transitions.clear()
         # Do something with the generated graph:
         self.execute_test()
-        self.write_solution()
+        self.write_solution(self.graph_f)
 
     # Total Connectivity Test:
     def execute_test(self):
-        self._visit_nodes(self.graph.startNode)
+        self.visit_nodes(self.graph.startNode)
 
     # Visit all the nodes from node.
-    def _visit_nodes(self, node):
+    def visit_nodes(self, node):
         if node in self.visited_nodes:
             return
 
@@ -35,7 +35,7 @@ class TotalConnectTest(Test):
            if transition not in self.visited_transitions:
                self.visited_transitions.add(transition)
                if transition.is_valid():
-                   self._visit_nodes(transition.destination)
+                   self.visit_nodes(transition.destination)
     
     """
         Overrides the parent write_solution method
@@ -45,6 +45,14 @@ class TotalConnectTest(Test):
         try:
             with open(graph_file, "w") as file:
                 file.write("Total Connectivity Test:\n")
+                if len(self.visited_nodes) == len(self.graph):
+                    file.write("--There are no non-visited nodes.")
+                    pass
+                else:
+                    file.write("--Non-visited nodes: \n")
+                    for node in self.visited_nodes:
+                        if node not in self.graph.nodes:
+                            file.write(node.name + "\n")
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:

@@ -16,7 +16,7 @@ class PrimePathCovTest(Test):
         self.prime_paths.clear()
         # Do something with the generated graph:
         self.execute_test()
-        self.write_solution()
+        self.write_solution(self.graph_f)
         
     # Prime Path Coverage Test:
     def execute_test(self):
