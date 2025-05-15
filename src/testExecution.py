@@ -1,6 +1,4 @@
-import subprocess
 import os
-import shutil
 import time
 from test import Test
 from graphsDef import Graph, Node, Transition
@@ -15,35 +13,67 @@ class TestExecution:
 
     def __init__(self):
         self.test_to_execute = []
-        self.file_output = "output.txt"
-        os.makedirs(self.screenshot_dir, exist_ok=True)  # Create the directory if it doesn't exist
+        self.differences_found = 0
+        self.file_output = "bin/output.txt"
+        #os.makedirs(self.screenshot_dir, exist_ok=True)  # Create the directory if it doesn't exist
 
     """
         Compare two graphs and return True if they are equal, False otherwise.
     """
-    def compare_graphs(self, graph1, graph2):
-        #if DEBUG:
-        #    print("[DEBUG] Comparing graphs...")
-        #    graph1 = GraphIO.read_graph("graph1.json")
-        #else:
-        #    print("[INFO] Comparing graphs...")
-        #    generated_graph = GenerateGraph.generate_graph(self.graph)
+    def compare_graphs(self, graph1, graph2):  
+        print("[INFO] Comparing graphs.")
+        self.file_output = open(test.file_output, "w")   
+        self.differences_found = 0  # differences found
+        if graph1 is None or graph2 is None:
+            self.file_output.write("[ERROR] One of the graphs is None.")
+            return False         
+            
+        self.file_output.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
+        self.compare_aux(graph1, graph2)
+        
+        self.file_output.write("[COMPARING GIVEN GRAPH vs GENERATED GRAPH]\n")
+        self.compare_aux(graph2, graph1)
 
-        if len(graph1) != len(graph2):
-            return False
-
-        for node1 in graph1.nodes:
-            if graph2.is_node_in_graph_image(node1.image):
-                for trans1 in node1.transitions, node2.transitions:
-                    if trans1.destination is not in node2.transitions:
-                    self.file_output.write(f"Transition {trans1} not found in graph2.\n")
-            else:
-                return False
+        print("[INFO] Graph comparison finished. " + str(self.differences_found) + " differences found.")
+        if self.differences_found == 0:
+            print("[INFO] No differences found.")
+            self.file_output.write("[NO DIFFERENCES FOUND]\n")
         
         self.execute_tests()
-
         return True
-        
+
+    """
+        Compare two graphs.
+    """
+    def compare_aux(self, graph1, graph2):
+        for node1 in graph1.nodes:
+            print("[INFO] Comparing node: " + node1.name)
+            node2 = graph2.get_node_image(node1.image)
+            if node2 is None: # Node is not in generated graph
+                print("[INFO] Node not found: " + node1.name)
+                self.file_output.write("[MISSING NODE] " + node1.name + " not in graph2\n")
+                self.differences_found += 1
+                continue
+
+            for trans1 in node1.transitions:
+                dest_image = trans1.destination.image
+                found = False
+                
+                for trans2 in node2.transitions:
+                    print("[INFO] Comparing transition: " + trans1.image)
+                    if trans2.image == trans1.image:
+                        print("[INFO] Transition found: " + trans1.image)
+                        if trans2.destination.image != dest_image:
+                            print("[INFO] Transition mismatch: " + trans1.image)
+                            # Writes the objetive destination and the real destination
+                            self.file_output.write("[MISMATCH TRANSITION] Supposed: " + node1.name + " -/-> " + trans1.destination.name + " Real: " + node1.name +" -> " + trans2.destination.name + "\n")
+                            self.differences_found += 1
+                        found = True
+                        continue
+                if not found:
+                    print("[INFO] Transition not found: " + trans1.image)
+                    self.file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + "\n")
+                    self.differences_found += 1
     """
         Adds a test to the list of tests to be executed
     """
@@ -64,3 +94,15 @@ class TestExecution:
                 test.write_solution(self.file_output)
             else:
                 print(f"Test {test} is not a valid Test instance.")
+
+# EXAMPLE OF USAGE
+# 
+# if __name__ == "__main__":
+#    base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Obtain the base path
+#    img_path = os.path.join(base_path, "imgs") 
+#    given_graph_path = os.path.join(base_path, "src\generated_graph_test.txt")
+#    generated_graph_path = os.path.join(base_path, "src\given_graph_test.txt") 
+#    graph_io = GraphIO() 
+#    given_graph = graph_io.load_graph(given_graph_path, img_path)
+#    generated_graph = graph_io.load_graph(generated_graph_path, img_path)
+#    test.compare_graphs(generated_graph, given_graph)

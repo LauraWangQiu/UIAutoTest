@@ -49,6 +49,15 @@ class Node:
     def get_transitions(self):
         return self.transitions
 
+    def is_transition_in_node_image(self, image):
+        print("[INFO] Graph nodes: ", self.nodes)
+        for transition in self.transitions:
+            if transition.destination.image is image:
+                #print("[INFO] Node '" + node.name + "' is in the graph.")
+                return True
+        #print("[ERROR] Node '" + name + "' is not in the graph.")
+        return False
+
 """
     Class Transition contains a condition to go to destination node
     
@@ -186,6 +195,15 @@ class Graph:
             if node.name == name:
                 return node
         print("[ERROR] Node not found: " + name)
+        return None
+    """
+        Returns the node with the given image.
+       """
+    def get_node_image(self, image):
+        for node in self.nodes:
+            if node.image == image:
+                return node
+        print("[ERROR] Node not found: " + image)
         return None
 
     """
