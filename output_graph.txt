@@ -1,2 +1,3 @@
-v C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\main_menu None
-v C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\brownie_menu None
+v intro_sc.png None
+v main_menu_sc.png None
+v brownie_menu_sc.png None

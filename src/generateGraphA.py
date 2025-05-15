@@ -21,6 +21,7 @@ class GenerateGraph:
         self.delay_ms = 3   # Ahora en segundos para simplificar con time.sleep
         self.actual_node = None
         self.start_node = None
+        self.process = None
         self.sikuli = SikulixWrapper()        
         self.graph_io = GraphIO()  
         self._stop_loop = threading.Event()
@@ -42,10 +43,6 @@ class GenerateGraph:
         # when the loop ends, we can save the graph
         self.graph_io.write_graph("output_graph.txt", self.graph)
         print("[INFO] graph has been saved to output_graph.txt")
-        # Close game and restart
-        self.process.terminate()
-        self.process.wait()
-        print("[INFO] Executable terminated.")
 
     def _start_executable(self):
         try:
@@ -56,40 +53,84 @@ class GenerateGraph:
         except FileNotFoundError:
             print("[INFO] Executable not found: " + str(self.selected_executable))
             self.process = None
-
-        # Marca para terminar el bucle del grafo cuando acabe el ejecutable
-        self._stop_loop.set()
+        
+    """
+        Forces the executable to close.
+    """
+    def _stop_executable(self):
+        try:
+            if self.process is not None:
+                print("[INFO] Stopping executable: " + str(self.selected_executable))
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)  # Waits 5 seconds to terminate.
+                except Exception:
+                    print("[INFO] Forcing the executable to stop...")
+                    self.process.kill()
+                    self.process.wait()
+                print("[INFO] Executable terminated.")
+                self.process = None
+            if self._executable_thread is not None and self._executable_thread.is_alive():
+                print("[INFO] Waiting the executable thread to end...")
+                self._executable_thread.join(timeout=5)
+                print("[INFO] Executable thread ended.")
+        except Exception as e:
+            print("[ERROR] Error on closing executable: "+e)
+            self.process = None
 
     def _loop(self):
-        time.sleep(self.delay_ms)  # Espera antes de volver a iterar
+
         print("[LOOP] Iniciando bucle de generación de grafo...")
         actual_path = os.getcwd()
         self_path = os.path.join(actual_path, "imgs", "self_nodes")
         generated_path = os.path.join(actual_path, "imgs", "generated_nodes")
-        end_loop = False # Flag to end the loop
-        while not self._stop_loop.is_set() and not end_loop:
-            found_node = False
-            for file in os.listdir(self_path):
-                state_path = os.path.join(self_path, file)
-                image_menu = [f for f in os.listdir(state_path) if os.path.isfile(os.path.join(state_path, f))]
-                #print("[LOOP] Archivo válido encontrado: " + state_path)
-                if self.sikuli.search_image(os.path.join(state_path, image_menu[0]), timeout=0.001):  # Si la pantalla coincide
-                    print("[LOOP] Imagen coincidente encontrada: " + image_menu[0])
-                    found_node = True
-                    if self.graph.is_node_in_graph(image_menu[0]):
-                        print("[LOOP] Node already in graph: " + image_menu[0])
-                        self._stop_loop.set()  # Ends the loop
-                        return
-                    
-                    new_node = Node(image_menu[0]) # Creates a new node
-                    new_node.set_image(os.path.join(state_path, image_menu[0])) # Sets the image
-                    self.graph.add_node(new_node.name)
-                    self.input_sikuli(os.path.join(state_path, "buttons"), new_node)
-                    break
-            if not found_node:
-                self.sikuli.capture_error("error_wait_.png")
-                self.graph.add_node("NewNode")
+        # set to save the visited folders
+        visited_images = set()  
+        all_images = set([i for i, _, _ in os.walk(self_path) if os.path.isfile(i)]) # All images in self_path
+        while not self._stop_loop.is_set():
+            end_loop = False # Flag to end the loop
+            print("[LOOP] Restarting loop...")
+            # Restart the executable.
+            if self.process is None:
+            	self._executable_thread = threading.Thread(target=self._start_executable)
+                self._executable_thread.start()
+            time.sleep(self.delay_ms)  # Espera antes de volver a iterar
+            while not end_loop:
+                print("[LOOP] Trying branch...")
+                found_node = False
+                for file in os.listdir(self_path):
+                    state_path = os.path.join(self_path, file)
+                    image_menu = [f for f in os.listdir(state_path) if os.path.isfile(os.path.join(state_path, f))]
+                    # If screen si the same as image_menu[0]
+                    if self.sikuli.search_image(os.path.join(state_path, image_menu[0]), timeout=0.001):  
+                        print("[LOOP] Founded screen: " + image_menu[0])
+                        found_node = True
+                        if self.graph.is_node_in_graph(image_menu[0]):
+                            print("[LOOP] Node already in graph: " + image_menu[0])
+                            visited_images.add(state_path)  # Add the folder to the visited folders
+                            end_loop = True
+                            break
+
+                        new_node = Node(image_menu[0]) # Creates a new node
+                        new_node.set_image(os.path.join(state_path, image_menu[0])) # Sets the image
+                        self.graph.add_node(new_node.name)
+                        self.input_sikuli(os.path.join(state_path, "buttons"), new_node)
+                        break
+                if not found_node:
+                    self.sikuli.capture_error("error_wait_.png")
+                    self.graph.add_node("NewNode")
+            
+            # Close game
+            if self.process is not None:
+                self._stop_executable()
                 
+
+            # If graph has visited all images, end the loop
+            if len(visited_images) >= len(all_images):
+                print("[LOOP] All images visited, ending loop.")
+                end_loop = True
+        if found_node and self.actual_node is None:
+            pass
         print("[LOOP] Bucle de grafo terminado.")  
 
     # Si quieres dejar input_sikuli y click, hazlos métodos de instancia
@@ -108,12 +149,15 @@ class GenerateGraph:
         Clicks on the images in the given path.
     """
     def click(self, images_path, node):
+        if not os.path.isdir(images_path):
+            print("[INPUT_SIKULI] El directorio " + images_path + " no existe o no es un directorio. Saltando click.")
+            return
         buttons_images = [f for f in os.listdir(images_path) if os.path.isfile(os.path.join(images_path, f))]
         for img in buttons_images:
-            print("[INPUT_SIKULI] clicking "+os.path.join(images_path,img)+"...")
+            print("[INPUT_SIKULI] clicking " + os.path.join(images_path, img) + "...")
             transition = Transition(node)
             node.add_transition(transition)
-            self.sikuli.click_image(os.path.join(images_path,img),timeout=0.001)
+            self.sikuli.click_image(os.path.join(images_path, img), timeout=0.001)
 
 if __name__ == "__main__":
     base_path = os.path.dirname(os.path.abspath(__file__))  # Obtiene el directorio actual del script
