@@ -5,19 +5,21 @@ class PrimePathCovTest(Test):
         super().__init__("PPC Test")
         self.graph = graph
         # Variables and modifiable parameters:
+        self.prime_paths = set()
 
     """
         Overrides the parent run method
     """
     def run(self):
         print("Running " + self.name + ".")
-        self.execute_test()
+        self.prime_paths.clear()
         # Do something with the generated graph:
+        self.execute_test()
+        self.write_solution() # TODO
         
     # Prime Path Coverage Test:
-    def execute_test(self) -> set:
+    def execute_test(self):
         all_paths = []
-        prime_paths = []
 
         # Get all the paths
         for node in self.graph.nodes:
@@ -33,11 +35,9 @@ class PrimePathCovTest(Test):
                         prime = False
                         break
             if prime:
-                prime_paths.append(referencePath)
+                self.prime_paths.append(referencePath)
 
-        return prime_paths
-
-    # DFS method to make all the paths.
+    # DFS method to get all the paths.
     def dfs(self, current, visited, path, all_paths):
         visited.add(current)
         path.append(current)

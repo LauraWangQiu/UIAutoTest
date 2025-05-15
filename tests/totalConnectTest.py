@@ -1,9 +1,10 @@
 from src.test import Test
 
 class TotalConnectTest(Test):
-    def __init__(self, graph=None):
+    def __init__(self, graph = None):
         super().__init__("TC Test")
         self.graph = graph
+        # Variables and modifiable parameters:
         self.visited_nodes = set()
         self.visited_transitions = set()
 
@@ -12,4 +13,32 @@ class TotalConnectTest(Test):
     """
     def run(self):
         print("Running " + self.name + ".")
-        # Do something with the generated graph
+        self.visited_nodes.clear()
+        self.visited_transitions.clear()
+        # Do something with the generated graph:
+        self.execute_test()
+        self.write_solution() # TODO
+
+    # Total Connectivity Test:
+    def execute_test(self):
+        self.visited_nodes
+        self.visited_transitions
+
+        self._visit_nodes(self.graph.startNode)
+
+    # Visit all the nodes from node.
+    def _visit_nodes(self, node):
+        if node in self.visited_nodes:
+            return
+
+        self.visited_nodes.add(node)
+
+        for transition in node.transitions:
+           if transition not in self.visited_transitions:
+               self.visited_transitions.add(transition)
+               if transition.is_valid():
+                   self._visit_nodes(transition.destination)
+
+    # TODO: PAIGRO HERE.
+    def write_solution(self):
+        pass
