@@ -57,7 +57,28 @@ class SikulixWrapper:
                 print("[WARNING] Not found. Trying again...")
 
         return False
+    
+    
+    def search_image_once(self, image_path, similarity=1.0, timeout=2):
+        """
+        Search for an image on the screen once.
 
+        :param image_path: Path to the image file to search for.
+        :param similarity: Similarity threshold (0.0–1.0).
+        :param timeout: How many seconds to wait.
+        :return: True if the image was found; False otherwise.
+        """
+        print("[INFO] Searching for image (once): " + image_path)
+        match = self.screen.exists(Pattern(image_path).similar(similarity), timeout)
+        if match:
+            print("[OK] Image found.")
+            return True
+        else:
+            print("[WARNING] Not found.")
+            return False
+
+
+    
     """
         Attempt to locate and click the given image on screen.
 
@@ -159,3 +180,5 @@ class SikulixWrapper:
         except Exception as e:
             print("[ERROR] Failed to save screenshot:" +e)
             return None
+    
+    

@@ -29,7 +29,7 @@ class GenerateGraph:
         self._stop_loop = threading.Event()
         self._executable_thread = None
         self._loop_thread = None
-
+        
     def generate_graph(self):
         print("Generating graph for " + str(self.selected_executable))
         self._executable_thread = threading.Thread()
@@ -148,25 +148,35 @@ class GenerateGraph:
             self.add_click_to_path(clicks_path,btn_path) #guardado de los clicks
            
             dest_state_path = None
-            for candidate_state in os.listdir(base_path):
-                candidate_path = os.path.join(base_path, candidate_state)
-                if not os.path.isdir(candidate_path):
-                    continue
-                candidate_images = [f for f in os.listdir(candidate_path)
-                                    if os.path.isfile(os.path.join(candidate_path, f)) and os.path.splitext(f)[1].lower() in self.valid_extensions]
-                if not candidate_images:
-                    continue
-                candidate_image_path = os.path.join(candidate_path, candidate_images[0])
-                print("[DFS] Probando si la pantalla coincide con: " + str(candidate_image_path))
-                if self.sikuli.search_image(candidate_image_path, timeout=0.0001,retries=20,similarity_reduction= 0.005):
-                    dest_state_path = candidate_path
-                    print("[DFS] La pantalla coincide con el estado: " + str(dest_state_path))
-                    break
+            initial_similarity = 0.99
+            min_similarity = 0.85
+            similarity_step = 0.01
+            similarity = initial_similarity
+
+            while similarity >= min_similarity and dest_state_path is None:
+                print("[DFS] Buscando estado destino con similitud: " + str(similarity))
+                for candidate_state in os.listdir(base_path):
+                    candidate_path = os.path.join(base_path, candidate_state)
+                    if not os.path.isdir(candidate_path):
+                        continue
+                    candidate_images = [f for f in os.listdir(candidate_path)
+                                        if os.path.isfile(os.path.join(candidate_path, f)) and os.path.splitext(f)[1].lower() in self.valid_extensions]
+                    if not candidate_images:
+                        continue
+                    candidate_image_path = os.path.join(candidate_path, candidate_images[0])
+                    print("[DFS] Probando si la pantalla coincide con: " + str(candidate_image_path))
+                    if self.sikuli.search_image_once(candidate_image_path, timeout=0.1 ,similarity=similarity):
+                        dest_state_path = candidate_path
+                        print("[DFS] La pantalla coincide con el estado: " + str(dest_state_path))
+                        break
+                similarity -= similarity_step
+           
 
             if dest_state_path is not None:
                 print("[DFS] Creando transicion desde nodo: " + str(node) + " con imagen: " + str(btn_path))
                 transition = Transition(node)
                 transition.image = btn_path
+                transition.action = "CLICK"
                 node.add_transition(transition)
                 print("[DFS] Transicion anadida. Llamando recursivamente a _dfs_state con destino: " + str(dest_state_path))
                 self._dfs_state(dest_state_path, visited_states, base_path, clicks_path)
@@ -194,6 +204,7 @@ class GenerateGraph:
             self._executable_thread = threading.Thread(target=self._start_executable)
             self._executable_thread.start()
             time.sleep(self.delay)
+
    
     def input_sikuli(self, buttons_path, node, visited_images):
         print("[INPUT_SIKULI] Iniciando input_sikuli...")
