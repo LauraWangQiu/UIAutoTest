@@ -14,13 +14,13 @@ GraphIO = _graph_io_module.GraphIO
 class GenerateGraph:
     valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp'}
 
-    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None):
+    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5):
         self.images_dir = images_dir
         self.practical_graph_file = practical_graph_file
         self.selected_executable = selected_executable
         self.graph = Graph()
         self.node_inputs = []
-        self.delay_ms = 5
+        self.delay = delay
         self.actual_node = None
         self.start_node = None
         self.process = None
@@ -87,7 +87,6 @@ class GenerateGraph:
             print("[LOOP] No states found.")
             return
         self._ensure_executable_running()
-        time.sleep(self.delay_ms)
         start_state = state_folders[0]
         self._dfs_state(start_state, visited_states, self_path,[])
         print("[LOOP] DFS graph loop finished.")
@@ -194,7 +193,7 @@ class GenerateGraph:
         if self.process is None:
             self._executable_thread = threading.Thread(target=self._start_executable)
             self._executable_thread.start()
-
+            time.sleep(self.delay)
    
     def input_sikuli(self, buttons_path, node, visited_images):
         print("[INPUT_SIKULI] Iniciando input_sikuli...")
@@ -234,16 +233,19 @@ if __name__ == "__main__":
     parser.add_argument("--images_dir", required=True, help="Path to the directory containing images.")
     parser.add_argument("--practical_graph_file", required=True, help="Name of the practical graph file to save.")
     parser.add_argument("--selected_executable", required=True, help="Path to the executable to run.")
+    parser.add_argument("--delay", type=int, default=5, help="Delay in seconds between actions.")
 
     args = parser.parse_args()
 
     print("[INFO] Images directory: " + str(args.images_dir))
     print("[INFO] Practical graph file: " + str(args.practical_graph_file))
     print("[INFO] Selected executable: " + str(args.selected_executable))
+    print("[INFO] Delay in seconds: " + str(args.delay))
 
     generator = GenerateGraph(
         images_dir=args.images_dir, 
         practical_graph_file=args.practical_graph_file, 
-        selected_executable=args.selected_executable
+        selected_executable=args.selected_executable,
+        delay=args.delay
     )
     generator.generate_graph()

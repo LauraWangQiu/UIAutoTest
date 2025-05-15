@@ -45,6 +45,7 @@ if __name__ == "__main__":
     theorical_graph_file =  config.get("theorical_graph_file", "graph.txt")
     practical_graph_file =  config.get("practical_graph_file", "output_graph.txt")
     selected_executable =   config.get("selected_executable", None)
+    executable_delay =      config.get("executable_delay", "5")
     tests_to_run =          config.get("tests_to_run", [])
 
     headless = True if config_file else False
@@ -61,6 +62,7 @@ if __name__ == "__main__":
         theorical_graph_file=theorical_graph_file,
         practical_graph_file=practical_graph_file,
         selected_executable=selected_executable,
+        executable_delay=executable_delay,
         tests_to_run=tests_to_run,
         headless=headless
     )

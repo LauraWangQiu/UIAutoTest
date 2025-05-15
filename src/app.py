@@ -35,6 +35,7 @@ class App(ctk.CTk):
                 theorical_graph_file,
                 practical_graph_file,
                 selected_executable,
+                executable_delay,
                 tests_to_run,
                 headless=False):
         self.java_path = java_path
@@ -47,14 +48,15 @@ class App(ctk.CTk):
         self.graph_io = GraphIO()       # GraphIO instance
         self.graph = Graph()            # Theoric graph
         self.graph_exe = Graph()        # Practical graph
-        self.theorical_graph_file = theorical_graph_file
-        self.practical_graph_file = practical_graph_file
-        self.images_dir = images_dir    # Directory of images
-        self.tests_dir = tests_dir      # Directory of tests
+        self.theorical_graph_file   = theorical_graph_file
+        self.practical_graph_file   = practical_graph_file
+        self.images_dir             = images_dir            # Directory of images
+        self.tests_dir              = tests_dir             # Directory of tests
         self.test_classes = self.get_test_classes()
-        self.selected_executable = selected_executable # Selected executable path
-        self.tests_to_run = tests_to_run# List of tests to run
-        self.headless = headless        # Store the headless mode flag
+        self.selected_executable    = selected_executable   # Selected executable path
+        self.executable_delay       = executable_delay      # Delay for the executable to start
+        self.tests_to_run           = tests_to_run          # List of tests to run
+        self.headless               = headless              # Store the headless mode flag
 
         if self.headless:
             print("[INFO] Application initialized in headless mode")
@@ -822,14 +824,14 @@ class App(ctk.CTk):
             try:
                 self.command = [
                     self.java_path,
-                    "--enable-native-access=ALL-UNNAMED",
                     "-cp",
                     f"{self.jython_jar};{self.sikulix_jar}",
                     "org.python.util.jython",
                     self.sikuli_script,
                     "--images_dir", self.images_dir,
                     "--practical_graph_file", self.practical_graph_file,
-                    "--selected_executable", self.selected_executable
+                    "--selected_executable", self.selected_executable,
+                    "--delay", self.executable_delay
                 ]
                 if any(arg is None for arg in self.command):
                     raise ValueError("[ERROR] One or more arguments in the Jython command are None.")
@@ -858,11 +860,22 @@ class App(ctk.CTk):
         self.jython_thread.start()
 
     def check_jython_thread(self, selected_test_classes):
-        if self.jython_thread.is_alive():
-            self.after(1000, self.check_jython_thread, selected_test_classes)
-        else:
-            print("[INFO] Jython thread finished.")
-            self.execute_tests(selected_test_classes)
+        def _check():
+            if self.jython_thread.is_alive():
+                try:
+                    if hasattr(self, "tk") and self.tk is not None:
+                        after_id = self.after(1000, _check)
+                        if hasattr(self, "after_ids"):
+                            self.after_ids.append(after_id)
+                    else:
+                        raise RuntimeError("Tkinter not initalized")
+                except Exception as e:
+                    threading.Timer(1.0, _check).start()
+            else:
+                print("[INFO] Jython thread finished.")
+                self.execute_tests(selected_test_classes)
+
+        _check()
 
     def execute_tests(self, selected_test_classes):
         for test_class_ref in selected_test_classes:

@@ -8,5 +8,6 @@
     "theorical_graph_file": "graph.txt",
     "practical_graph_file": "output_graph.txt",
     "selected_executable": "bin/Sample/My project.exe",
+    "executable_delay": "5",
     "tests_to_run": ["EdgePairCovTest", "PrimePathCovTest", "SelfLoopTest", "TotalConnectTest"]
 }
