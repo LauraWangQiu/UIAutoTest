@@ -38,7 +38,10 @@ class TotalConnectTest(Test):
                self.visited_transitions.add(transition)
                if transition.is_valid():
                    self._visit_nodes(transition.destination)
-
+    
+    """
+        Overrides the parent write_solution method
+    """
     # TODO: PAIGRO HERE.
     def write_solution(self):
         pass

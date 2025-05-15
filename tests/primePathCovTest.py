@@ -67,6 +67,9 @@ class PrimePathCovTest(Test):
                 return True
         return False
 
+    """
+        Overrides the parent write_solution method
+    """
     # TODO: PAIGRO HERE.
     def write_solution(self):
         pass
