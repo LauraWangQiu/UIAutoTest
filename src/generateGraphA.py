@@ -29,7 +29,7 @@ class GenerateGraph:
 
     def generate_graph(self):
         print("Generating graph for " + str(self.selected_executable))
-        self._executable_thread = threading.Thread(target=self._start_executable)
+        self._executable_thread = threading.Thread()
         self._executable_thread.start()
 
         self._loop_thread = threading.Thread(target=self._loop)
@@ -89,6 +89,7 @@ class GenerateGraph:
         start_state = state_folders[0]
         self._dfs_state(start_state, visited_states, self_path,[])
         print("[LOOP] DFS graph loop finished.")
+        self._stop_executable()
         self._stop_loop.set()
 
     def _dfs_state(self, state_path, visited_states, base_path, clicks_path):
@@ -123,7 +124,8 @@ class GenerateGraph:
             print("[DFS] No hay carpeta de botones en " + str(buttons_click_path))
             
             self._stop_executable()
-            self._start_executable()
+            self._ensure_executable_running()
+            clicks_path.pop()
             self.navigate_to_state(clicks_path)
            
             return
