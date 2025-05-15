@@ -115,6 +115,7 @@ class App(ctk.CTk):
         self.tab_control.add(self.states_tab, text="States")
         self.configure_states_tab()
 
+        
         # Tests tabs
         for test_class_name, test_class_ref in self.test_classes:
             self.add_test_tab(test_class_name, test_class_ref)
@@ -842,6 +843,8 @@ class App(ctk.CTk):
         # If headless mode, then run tests specified from file
         # else, run tests from the GUI
 
+        
+
         selected_test_classes = []
 
         if self.headless:
@@ -908,6 +911,7 @@ class App(ctk.CTk):
         self.jython_thread.start()
 
     def check_jython_thread(self, selected_test_classes):
+        
         def _check():
             if self.jython_thread.is_alive():
                 try:
@@ -930,6 +934,7 @@ class App(ctk.CTk):
             test_instance = test_class_ref(self.graph_io.load_graph(self.practical_graph_file, self.images_dir))
             test_instance.run()
             # TODO: Do something with the tests results
+            test_instance.write_solution("output_graph.txt")
         
         # Directly compare the generated graph with the expected graph
         if self.headless:
