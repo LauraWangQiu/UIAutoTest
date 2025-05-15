@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import subprocess
+import threading
 import math
 import inspect
 import importlib.util
@@ -9,16 +11,14 @@ import tkinter.ttk as ttk
 from tkinter import filedialog
 from tkinter.scrolledtext import ScrolledText
 from tkinter import messagebox
-from pathlib import Path
-from src.generateGraph import GenerateGraph
-from src.test import Test
-from src.graphsDef import Graph, Transition
-from src.testExecution import TestExecution
-import src.GraphIO as _graph_io_module
+from test import Test
+from graphsDef import Graph
+from graphsDef import Transition
+import GraphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
-class App(ctk.CTk):  
-    def __init__(self, window_name="UI Auto Test", window_size="800x600", tests_directory="tests", headless=False):
-        """
+
+class App(ctk.CTk):
+    """
         Constructor for the App class
 
         Args:
@@ -26,39 +26,64 @@ class App(ctk.CTk):
             window_size (str): The size of the application window (e.g., "800x600")
             tests_directory (str): The directory where test files are located
             headless (bool): Whether the application is running in headless mode
-        """
-       
-        self.headless = headless  # Store the headless mode flag
-        self.selected_executable = None
-        self.graph = Graph()  # Graph provided by the user
-        self.test_execution = TestExecution()
-        self.tests_dir = tests_directory
+    """
+    def __init__(self,
+                java_path, jython_jar, sikulix_jar,
+                sikuli_script,
+                window_name, window_size,
+                images_dir, tests_dir, 
+                theorical_graph_file,
+                practical_graph_file,
+                selected_executable,
+                tests_to_run,
+                headless=False):
+        self.java_path = java_path
+        self.jython_jar = jython_jar
+        self.sikulix_jar = sikulix_jar
+        self.sikuli_script = sikuli_script
+        self.jython_process = None
+        self.jython_thread = None
+
+        self.graph_io = GraphIO()       # GraphIO instance
+        self.graph = Graph()            # Theoric graph
+        self.graph_exe = Graph()        # Practical graph
+        self.theorical_graph_file = theorical_graph_file
+        self.practical_graph_file = practical_graph_file
+        self.images_dir = images_dir    # Directory of images
+        self.tests_dir = tests_dir      # Directory of tests
+        self.test_classes = self.get_test_classes()
+        self.selected_executable = selected_executable # Selected executable path
+        self.tests_to_run = tests_to_run# List of tests to run
+        self.headless = headless        # Store the headless mode flag
 
         if self.headless:
             print("[INFO] Application initialized in headless mode")
-            self.load_graph_from_file("graph.txt")
+            self.load_graph_from_file(self.theorical_graph_file)
+            self.run_tests()
         else: 
             super().__init__()
+            self.stop_event = threading.Event()
+            self.protocol("WM_DELETE_WINDOW", self.on_close)
             self.title(window_name)
             self.geometry(window_size)
             self.configure_grid()
+            self.after_ids = []
             self.selected_nodes = []
             self.node_frames = []
             self.node_frames_index = 1
             self.delay_ms_tabs = 100
             self.delay_ms_executable = 1000
-            self.after(self.delay_ms_tabs, self.create_tabs)
-        graph_io = GraphIO()        
-           
-        self.exegraph =  graph_io.load_graph(file_name, "imgs")
+            self.after_ids.append(self.after(self.delay_ms_tabs, self.create_tabs))
+            self.mainloop()
 
+    """
+        Load theorical graph from a file using GraphIO
+    """
     def load_graph_from_file(self, file_name):
         try:
-            print("[INFO] Loading graph from " + file_name + " using GraphIO...")
-            graph_io = GraphIO()        
-            self.graph = graph_io.load_graph(file_name, "imgs")
+            self.graph = self.graph_io.load_graph(file_name, "imgs")
             print("[INFO] Graph successfully loaded")
-            #graph_io.write_graph("mi_graph.txt", self.graph)
+            #self.graph_io.write_graph("mi_graph.txt", self.graph)
         except FileNotFoundError:
             print("[ERROR] File " + file_name + " not found")
         except Exception as e:
@@ -89,8 +114,7 @@ class App(ctk.CTk):
         self.configure_states_tab()
 
         # Tests tabs
-        test_classes = self.get_test_classes()
-        for test_class_name, test_class_ref in test_classes:
+        for test_class_name, test_class_ref in self.test_classes:
             self.add_test_tab(test_class_name, test_class_ref)
 
         # Test Runner tab
@@ -697,6 +721,15 @@ class App(ctk.CTk):
         select_executable_button = ctk.CTkButton(test_runner_tab, text="Select Executable", command=self.select_executable)
         select_executable_button.pack(fill="x", padx=10, pady=5)
 
+        # Entry to display the selected images directory
+        self.images_dir_entry = ctk.CTkEntry(test_runner_tab, state="readonly", font=ctk.CTkFont(size=12))
+        self.images_dir_entry.insert(0, "Images Directory: None")
+        self.images_dir_entry.pack(fill="x", padx=10, pady=5)
+
+        # Button to select images directory
+        select_images_dir_button = ctk.CTkButton(test_runner_tab, text="Select Images Directory", command=self.select_images_dir)
+        select_images_dir_button.pack(fill="x", padx=10, pady=5)
+
         # Title
         title_label = ctk.CTkLabel(test_runner_tab, text="Select Tests to Run", font=ctk.CTkFont(size=16, weight="bold"))
         title_label.pack(pady=10)
@@ -724,38 +757,122 @@ class App(ctk.CTk):
         for widget in self.test_list_frame.winfo_children():
             widget.destroy()
 
-        test_classes = self.get_test_classes()
-
         # Add each test as a checkbox
         self.test_checkboxes = {}
-        for test_class_name, test_class_ref in test_classes:
+        for test_class_name, test_class_ref in self.test_classes:
             var = ctk.BooleanVar(value=False)
             checkbox = ctk.CTkCheckBox(self.test_list_frame, text=test_class_name, variable=var)
             checkbox.pack(anchor="w", padx=5, pady=2)
             self.test_checkboxes[test_class_name] = (var, test_class_ref)
 
     """
+        Select the images directory using a file dialog and update the entry field with the selected path
+    """
+    def select_images_dir(self):
+        directory_path = filedialog.askdirectory(
+            title="Select Images Directory"
+        )
+        if directory_path:
+            self.images_dir = directory_path
+            print(f"Selected images directory: {self.images_dir}")
+
+            self.images_dir_entry.configure(state="normal")
+            self.images_dir_entry.delete(0, "end")
+            self.images_dir_entry.insert(0, self.images_dir)
+            self.images_dir_entry.configure(state="readonly")
+
+    """
         Run the selected tests.
     """
     def run_tests(self):
         if not self.selected_executable:
-            print("[INFO] No executable selected. Please select an executable first")
+            print("[ERROR] No executable selected. Please select an executable first.")
             return
+        
+        # If headless mode, then run tests specified from file
+        # else, run tests from the GUI
 
-        selected_tests = [
-            test_class_ref for test_class_name, (var, test_class_ref) in self.test_checkboxes.items() if var.get()
-        ]
+        selected_test_classes = []
 
-        if not selected_tests:
+        if self.headless:
+            available_test_classes = {name: ref for name, ref in self.test_classes}
+            for test_name in self.tests_to_run:
+                if test_name in available_test_classes:
+                    selected_test_classes.append(available_test_classes[test_name])
+                else:
+                    print(f"[ERROR] Test class '{test_name}' not found in available test classes.")
+        else:
+            selected_test_classes = [
+                test_class_ref for test_class_name, (var, test_class_ref) in self.test_checkboxes.items() if var.get()
+            ]
+
+        if not selected_test_classes:
             print("[INFO] No tests selected")
             return
         
-        generate_graph = GenerateGraph(selected_executable=self.selected_executable)
-        generate_graph.generate_graph()
-        graph = generate_graph.get_graph()
+        self.run_jython()
 
-        self.test_execution.add_tests_to_Execute(selected_tests)
-        self.test_execution.compare_graphs(self.graph )
+        self.check_jython_thread(selected_test_classes)
+
+    """
+        Run the Jython script to generate the graph
+    """
+    def run_jython(self):
+        def execute_command():
+            try:
+                self.command = [
+                    self.java_path,
+                    "--enable-native-access=ALL-UNNAMED",
+                    "-cp",
+                    f"{self.jython_jar};{self.sikulix_jar}",
+                    "org.python.util.jython",
+                    self.sikuli_script,
+                    "--images_dir", self.images_dir,
+                    "--practical_graph_file", self.practical_graph_file,
+                    "--selected_executable", self.selected_executable
+                ]
+                if any(arg is None for arg in self.command):
+                    raise ValueError("[ERROR] One or more arguments in the Jython command are None.")
+                print("[INFO] Running Jython script: " + " ".join(self.command) + "\n")
+
+                with subprocess.Popen(
+                    self.command,
+                    stdout=sys.__stdout__,
+                    stderr=sys.__stderr__,
+                    text=True,
+                    shell=True
+                ) as process:
+                    while process.poll() is None:
+                        if self.stop_event.is_set():
+                            process.terminate()
+                            print("[INFO] Jython script terminated.")
+                            return
+                        threading.Event().wait(0.1)
+
+            except Exception as e:
+                print("[ERROR] Failed to run Jython script: " + str(e) + "\n")
+            finally:
+                self.jython_process = None
+
+        self.jython_thread = threading.Thread(target=execute_command, daemon=True)
+        self.jython_thread.start()
+
+    def check_jython_thread(self, selected_test_classes):
+        if self.jython_thread.is_alive():
+            self.after(1000, self.check_jython_thread, selected_test_classes)
+        else:
+            print("[INFO] Jython thread finished.")
+            self.execute_tests(selected_test_classes)
+
+    def execute_tests(self, selected_test_classes):
+        for test_class_ref in selected_test_classes:
+            test_instance = test_class_ref(self.graph_io.load_graph(self.practical_graph_file, self.images_dir))
+            test_instance.run()
+            # TODO: Do something with the tests results
+        
+        # Directly compare the generated graph with the expected graph
+        if self.headless:
+            self.compare()
 
     """
         Compare the generated graph with specified graph
@@ -786,7 +903,31 @@ class App(ctk.CTk):
         Restore the original stdout when the application is closed
     """
     def on_close(self):
+        print("[INFO] Stopping all threads...")
+        self.stop_event.set()
+
+        for after_id in self.after_ids:
+            try:
+                self.after_cancel(after_id)
+            except Exception as e:
+                print(f"[WARNING] Failed to cancel event {after_id}: {e}")
+
+        if hasattr(self, "jython_process") and self.jython_process is not None:
+            print("[INFO] Terminating Jython process...")
+            self.jython_process.terminate()
+            self.jython_process.wait()
+            print("[INFO] Jython process terminated.")
+
+        threading.Event().wait(0.5)
+
         sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+
+        try:
+            self.quit()
+        except Exception as e:
+            print(f"[WARNING] Failed to quit mainloop: {e}")
+
         self.destroy()
 
     """
@@ -804,6 +945,8 @@ class App(ctk.CTk):
             self.text_widget.insert("end", message)
             self.text_widget.configure(state="disabled")
             self.text_widget.see("end")
+
+            sys.__stdout__.write(message)
 
         """
             Flush the output buffer

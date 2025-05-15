@@ -1,0 +1,12 @@
+{
+    "java_path": "java",
+    "jython_jar": "jython-standalone-2.7.4.jar",
+    "sikulix_jar": "sikulixapi-2.0.5.jar",
+    "sikuli_script": "src/generateGraph.py",
+    "images_dir": "imgs",
+    "tests_dir": "tests",
+    "theorical_graph_file": "graph.txt",
+    "practical_graph_file": "output_graph.txt",
+    "selected_executable": "bin/Sample/My project.exe",
+    "tests_to_run": ["EdgePairCovTest", "PrimePathCovTest", "SelfLoopTest", "TotalConnectTest"]
+}

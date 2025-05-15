@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
-from sikuli import Screen, Pattern, Key, KeyModifier, Settings
+import sys
+from java.lang import System
+from org.python.core import PySystemState
 
+py_sys = PySystemState()
+py_sys.path.append("sikulixapi-2.0.5.jar")
 
+from org.sikuli.script import Screen, Pattern, Key, KeyModifier
+from org.sikuli.basics import Settings
 
+"""
+Decorator to turn a class into a Singleton.
+Ensures only one instance of the class is ever created.
+"""
 def singleton(cls):
-    """
-    Decorator to turn a class into a Singleton.
-    Ensures only one instance of the class is ever created.
-    """
     instances = {}
     def get_instance(*args, **kwargs):
         if cls not in instances:
@@ -15,30 +21,29 @@ def singleton(cls):
         return instances[cls]
     return get_instance
 
-
-@singleton
-class SikulixWrapper:
-    """
+"""
     Wrapper around SikuliX's Screen object, implemented as a Singleton.
     Provides convenient methods to search for and click images,
     as well as to capture screenshots on error.
-    """
+"""
+@singleton
+class SikulixWrapper:
     def __init__(self):
         self.screen = Screen()
         Settings.MinTargetSize = 0.5  
-        Settings.MaxTargetSize = 2.0  
+        Settings.MaxTargetSize = 2.0
 
+    """
+    Attempt to locate the given image on screen several times.
+
+    :param image_path: Path to the image file to search for.
+    :param similarity: Starting similarity threshold (0.0–1.0).
+    :param timeout: How many seconds to wait on each try.
+    :param retries: Number of attempts before giving up.
+    :param similarity_reduction: Amount to reduce similarity per attempt.
+    :return: True if the image was found; False otherwise.
+    """
     def search_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction = 0.1 ):
-        """
-        Attempt to locate the given image on screen several times.
-
-        :param image_path: Path to the image file to search for.
-        :param similarity: Starting similarity threshold (0.0–1.0).
-        :param timeout: How many seconds to wait on each try.
-        :param retries: Number of attempts before giving up.
-        :param similarity_reduction: Amount to reduce similarity per attempt.
-        :return: True if the image was found; False otherwise.
-        """
         print("[INFO] Searching for image: " + image_path)
         for attempt in range(retries):
             actual_attempt = attempt + 1
@@ -53,8 +58,7 @@ class SikulixWrapper:
 
         return False
 
-    def click_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction = 0.1 ):
-        """
+    """
         Attempt to locate and click the given image on screen.
 
         :param image_path: Path to the image file to click.
@@ -63,7 +67,8 @@ class SikulixWrapper:
         :param retries: Number of attempts before giving up.
         :param similarity_reduction: Amount to reduce similarity per attempt.
         :return: True if the click was successful; False otherwise.
-        """
+    """
+    def click_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction = 0.1 ):
         print("[INFO] Trying click on image: " + image_path)
         for attempt in range(retries):
             actual_attempt = attempt + 1
@@ -78,8 +83,8 @@ class SikulixWrapper:
                 print("[WARNING] Not found. Trying again...")
 
         return False
-    def write_text(self, image_path, text, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, clear_before=False):
-        """
+    
+    """
         Clicks on an image (e.g., input field) and types text into it.
 
         :param image_path: Path to the image of the target input field.
@@ -90,7 +95,8 @@ class SikulixWrapper:
         :param similarity_reduction: Amount to reduce similarity per attempt.
         :param clear_before: If True, clears the field before typing.
         :return: True if successful, False otherwise.
-        """
+    """
+    def write_text(self, image_path, text, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, clear_before=False):
         for attempt in range(retries):
             actual_similarity = similarity - (similarity_reduction * attempt)
             actual_attempt = attempt + 1
@@ -138,16 +144,14 @@ class SikulixWrapper:
         print("[FAIL] Failed to perform drag and drop.")    
         return False
 
-    def capture_error(self, filename, folder="."):
-
-        """
+    """
         Capture the current screen and save it to a file.
 
         :param filename: Name of the file to save the screenshot as.
         :param folder: Directory in which to save the screenshot.
         :return: File path if successful; None on failure.
-        """
-
+    """
+    def capture_error(self, filename, folder="."):
         try:
             filepath = self.screen.capture().save(folder, filename)
             print("[CAPTURE] Saved screenshot:" + filepath)

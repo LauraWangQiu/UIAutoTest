@@ -28,7 +28,7 @@ Additionally, [Python](https://www.python.org/downloads/) will be used as the sc
 ### Other aspects
 
 > [!NOTE]
-> All the images must have sufficient quality to be clicked and displayed in the executable large enough.
+> All the images must have sufficient quality to be clicked and displayed in the executable large enough. Image captures should be taken from the machine where it will run the tests.
 
 > [!NOTE]
 > Screen resolution must be on 100% without scaling.
@@ -48,9 +48,7 @@ pip install -r requirements.txt
 ## Try it
 
 ```ps
-java -cp "sikulixapi-2.0.5.jar;jython-standalone-2.7.4.jar" org.python.util.jython .\src\generateGraphA.py
+python UIAutoTest.py <config.json>
 ```
 
-```ps
-python UIAutoTest.py
-```
+If `config.json` is passed as an argument, it will not create an interface.

@@ -1,4 +1,4 @@
-from src.test import Test
+from test import Test
 
 class TotalConnectTest(Test):
     def __init__(self, graph = None, graph_file = "output_graph.txt"):
@@ -14,11 +14,11 @@ class TotalConnectTest(Test):
     """
     def run(self):
         print("Running " + self.name + ".")
-        self.visited_nodes.clear()
-        self.visited_transitions.clear()
-        # Do something with the generated graph:
-        self.execute_test()
-        self.write_solution(self.graph_f)
+        # self.visited_nodes.clear()
+        # self.visited_transitions.clear()
+        # # Do something with the generated graph:
+        # self.execute_test()
+        # self.write_solution(self.graph_f)
 
     # Total Connectivity Test:
     def execute_test(self):

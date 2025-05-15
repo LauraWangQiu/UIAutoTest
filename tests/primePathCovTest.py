@@ -1,4 +1,4 @@
-from src.test import Test
+from test import Test
 
 class PrimePathCovTest(Test):
     def __init__(self, graph = None, graph_file = "output_graph.txt"):
@@ -13,10 +13,10 @@ class PrimePathCovTest(Test):
     """
     def run(self):
         print("Running " + self.name + ".")
-        self.prime_paths.clear()
-        # Do something with the generated graph:
-        self.execute_test()
-        self.write_solution(self.graph_f)
+        # self.prime_paths.clear()
+        # # Do something with the generated graph:
+        # self.execute_test()
+        # self.write_solution(self.graph_f)
         
     # Prime Path Coverage Test:
     def execute_test(self):
@@ -36,7 +36,7 @@ class PrimePathCovTest(Test):
                         prime = False
                         break
             if prime:
-                self.prime_paths.append(referencePath)
+                self.prime_paths.add(referencePath)
 
     # DFS method to get all the paths.
     def dfs(self, current, visited, path, all_paths):
