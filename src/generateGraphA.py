@@ -94,7 +94,11 @@ class GenerateGraph:
 
     def _dfs_state(self, state_path, visited_states, base_path, clicks_path):
         if state_path in visited_states: #si visitado pasamos
+            self._stop_executable()
+            self._ensure_executable_running()
             print("[DFS] Estado ya visitado: " + str(state_path))
+            clicks_path.pop()
+            self.navigate_to_state(clicks_path)
             return
         print("[DFS] Visitando estado: " + str(state_path))
         visited_states.add(state_path)
@@ -136,7 +140,10 @@ class GenerateGraph:
         for idx, btn in enumerate(buttons):
             btn_path = os.path.join(buttons_click_path, btn)
             print("[DFS] Simulando click en: " + str(btn_path))
-            self.sikuli.click_image(btn_path, timeout=0.01)
+            result = self.sikuli.click_image(btn_path, timeout=0.01)
+            if not result:
+                print("[DFS] No se pudo hacer click en: " + str(btn_path))
+                continue
             self.add_click_to_path(clicks_path,btn_path) #guardado de los clicks
            
             dest_state_path = None
