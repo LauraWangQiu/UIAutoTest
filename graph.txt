@@ -11,6 +11,7 @@
 v A prueba.png
 v B prueba2.png
 v C unity.png
+v D D_state.png
 
 # Directed edges section
 # Each edge is declared as:
@@ -20,4 +21,5 @@ v C unity.png
 
 e CLICK A B imagen2.png
 e CLICK B A boton3.png
-e CLICK_AND_TYPE A C image3.png Unity 
+e CLICK_AND_TYPE Unity A C image3.png
+e DRAG_AND_DROP C D explorer.png carpeta.png

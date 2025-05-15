@@ -107,6 +107,34 @@ class SikulixWrapper:
 
         print("[FAIL] Failed to write text.")
         return False
+    
+    def drag_and_drop(self, source_image_path, target_image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1):
+        """
+        Performs a drag and drop from the source image to the target image.
+
+        :param source_image_path: Path to the image to drag from.
+        :param target_image_path: Path to the image to drop to.
+        :param similarity: Starting similarity threshold.
+        :param timeout: Time to wait per attempt.
+        :param retries: Number of attempts before giving up.
+        :param similarity_reduction: Amount to reduce similarity per attempt.
+        :return: True if successful, False otherwise.
+        """
+        for attempt in range(retries):
+            actual_similarity = similarity - (similarity_reduction * attempt)
+            actual_attempt = attempt + 1
+            print("Attempts " + str(actual_attempt) + "/" + str(retries))
+            source_match = self.screen.exists(Pattern(source_image_path).similar(actual_similarity), timeout)
+            target_match = self.screen.exists(Pattern(target_image_path).similar(actual_similarity), timeout)
+            if source_match and target_match:
+                self.screen.dragDrop(source_match, target_match)
+                print("[OK] Drag and drop performed.")
+                return True
+            else:
+                print("[WARNING] Source or target image not found. Retrying...")
+
+        print("[FAIL] Failed to perform drag and drop.")    
+        return False
 
     def capture_error(self, filename, folder="."):
 
