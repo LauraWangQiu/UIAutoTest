@@ -83,16 +83,16 @@ class GraphIO:
                                 self.handle_double_click_action(src_node, tgt_node, os.path.join(img_dir, img))
 
                         elif action == ActionType.CLICK_AND_TYPE:
-                            if len(parts) != 6:
-                                print("[ERROR] Invalid number of args for CLICK_AND_TYPE, expected 6 but got " + str(len(parts)))
+                            if len(parts) != 5:
+                                print("[ERROR] Invalid number of args for CLICK_AND_TYPE, expected 5 but got " + str(len(parts)))
                                 continue
-                            img = parts[4]
-                            text = parts[5]
+                            img = parts[3]
+                            text = parts[4]
                             self.handle_click_and_type_action(src_node, tgt_node, text, os.path.join(img_dir, img))
 
                         elif action == ActionType.DRAG_AND_DROP:
-                            if len(parts) != 7:
-                                print("[ERROR] Invalid number of args for DRAG_AND_DROP, expected 7 but got " + str(len(parts)))
+                            if len(parts) != 6:
+                                print("[ERROR] Invalid number of args for DRAG_AND_DROP, expected 6 but got " + str(len(parts)))
                                 continue
                             drag_img = parts[4]
                             drop_img = parts[5]
@@ -148,35 +148,36 @@ class GraphIO:
         transition.update_drag_and_drop(drag_image, drop_image)
         print("[INFO] DRAG_AND_DROP action handled")
 
-    def write_graph(self, graph_file, graph):
+    def write_graph(self, images_dir, graph_file, graph):
         print("[INFO] Writing graph to " + graph_file)
         try:
             with open(graph_file, "w") as f:
                 edge_lines = []
                 # Iterate nodes and write only the vertices, but accumulate edges
                 for node in graph.nodes:
-                    image_name = node.image.split("imgs\\", 1)[1]
-                    f.write("v " + node.name + " " + image_name + "\n")
+                    node_name = node.name.replace(" ", "_")
+                    image_name = node.image.split(images_dir, 1)[1]
+                    f.write("v " + node_name + " " + image_name + "\n")
 
                     for trans in node.transitions:
                         act = trans.action if trans.action else "None"
-                        dst = trans.destination.name
+                        dst = trans.destination.name.replace(" ", "_")
 
                         if act in ("CLICK", "DOUBLE_CLICK"):
-                            image_name = trans.image.split("imgs\\", 1)[1]
-                            edge_lines.append("e " + act + " " + node.name + " " + dst + " " + image_name + "\n")
+                            image_name = trans.image.split(images_dir, 1)[1]
+                            edge_lines.append("e " + act + " " + node_name + " " + dst + " " + image_name + "\n")
 
                         elif act == "CLICK_AND_TYPE":
-                            image_name = trans.image.split("imgs\\", 1)[1]
-                            edge_lines.append("e " + act + " " + node.name + " " + dst + " " + image_name + " " + trans.text + "\n")
+                            image_name = trans.image.split(images_dir, 1)[1]
+                            edge_lines.append("e " + act + " " + node_name + " " + dst + " " + image_name + " " + trans.text + "\n")
 
                         elif act == "DRAG_AND_DROP":
-                            drag_image_name = trans.drag_image.split("imgs\\", 1)[1]
-                            drop_image_name = trans.drop_image.split("imgs\\", 1)[1]
-                            edge_lines.append("e " + act + " " + node.name + " " + dst + " " + drag_image_name + " " + drop_image_name + "\n")
+                            drag_image_name = trans.drag_image.split(images_dir, 1)[1]
+                            drop_image_name = trans.drop_image.split(images_dir, 1)[1]
+                            edge_lines.append("e " + act + " " + node_name + " " + dst + " " + drag_image_name + " " + drop_image_name + "\n")
 
                         else:
-                            edge_lines.append("e " + act + " " + node.name + " " + dst + "\n")
+                            edge_lines.append("e " + act + " " + node_name + " " + dst + "\n")
                 # Write all edges at the end
                 f.writelines(edge_lines)
         except Exception as e:

@@ -13,6 +13,7 @@ from tkinter.scrolledtext import ScrolledText
 from PIL import Image, ImageTk
 from test import Test
 from graphsDef import Graph, Transition
+from actionTypes import ActionType
 import GraphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
 
@@ -209,7 +210,7 @@ class App(ctk.CTk):
             title="Save graph to file"
         )
         if file_path:
-            self.graph_io.write_graph(file_path, self.graph)
+            self.graph_io.write_graph(self.images_dir, file_path, self.graph)
 
     def load_graph_from_dialog(self):
         file_path = filedialog.askopenfilename(
@@ -465,6 +466,19 @@ class App(ctk.CTk):
             print("[INFO] Please select a transition from the current menu before adding a new one")
             return
 
+        for transition in node.transitions:
+            if not ActionType.is_valid_action(transition.action):
+                print("[INFO] Please select a valid action type for all transitions before adding a new one.")
+                return
+            if ActionType.requires_image(transition.action) and not transition.image:
+                print(f"[INFO] Please select an image for the {transition.action} transition before adding a new one.")
+                return
+            if ActionType.requires_drag_and_drop_images(transition.action) and (
+                not transition.drag_image or not transition.drop_image
+            ):
+                print("[INFO] Please select both drag and drop images for the DRAG_AND_DROP transition before adding a new one.")
+                return
+        
         available_nodes = [n.name for n in self.graph.nodes]
         if not available_nodes:
             print("[INFO] No available nodes to connect")
@@ -493,7 +507,8 @@ class App(ctk.CTk):
     def add_connection_to_node(self, node, selected_name):
         for n in self.graph.nodes:
             if n.name == selected_name:
-                node.add_transition(Transition(n, lambda: True))
+                new_transition = Transition(n, lambda: True)
+                node.add_transition(new_transition)
                 break
 
         self.update_transitions_list(node)
@@ -501,6 +516,88 @@ class App(ctk.CTk):
         if hasattr(node, "add_transition_menu"):
             node.add_transition_menu.destroy()
             delattr(node, "add_transition_menu")
+
+        self.create_input_type_menu(node, new_transition)
+
+        self.draw_graph()
+
+    """
+    """
+    def create_input_type_menu(self, node, transition):
+        input_type_frame = ctk.CTkFrame(node.transitions_list_frame)
+        input_type_frame.pack(fill="x", padx=5, pady=5)
+
+        transition.input_type_frame = input_type_frame
+
+        input_types = ["NONE"] + [ActionType.CLICK, ActionType.DOUBLE_CLICK, ActionType.CLICK_AND_TYPE, ActionType.DRAG_AND_DROP]
+
+        input_type_menu = ctk.CTkOptionMenu(
+            input_type_frame,
+            values=input_types,
+            command=lambda selected: self.on_input_type_selected(transition, selected)
+        )
+        input_type_menu.pack(side="left", padx=5, pady=5)
+
+        select_images_button = ctk.CTkButton(
+            input_type_frame,
+            text="Select Images",
+            command=lambda: self.select_images_for_transition(transition)
+        )
+        select_images_button.pack(side="right", padx=5, pady=5)
+
+    """
+        Select the input type for a transition
+    """
+    def on_input_type_selected(self, transition, selected_input_type):
+        transition.action = selected_input_type
+        print(f"[INFO] Transition action set to: {selected_input_type}")
+
+    """
+        Select images for the transition based on the selected action type
+    """
+    def select_images_for_transition(self, transition):
+        if transition.action == "NONE" or not transition.action:
+            print("[INFO] Please select a valid action type before selecting images.")
+            return
+        
+        if ActionType.requires_image(transition.action):
+            file_path = filedialog.askopenfilename(
+                title=f"Select Image for {transition.action}",
+                filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp"), ("All Files", "*.*")]
+            )
+            if file_path:
+                transition.image = file_path
+                print(f"[INFO] Image for {transition.action} set to: {file_path}")
+            else:
+                print(f"[INFO] No image selected for {transition.action} transition.")
+                return
+
+        elif ActionType.requires_drag_and_drop_images(transition.action):
+            drag_image_path = filedialog.askopenfilename(
+                title="Select Drag Image",
+                filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp"), ("All Files", "*.*")]
+            )
+            if drag_image_path:
+                transition.drag_image = drag_image_path
+                print(f"[INFO] Drag Image set to: {drag_image_path}")
+            else:
+                print("[INFO] No drag image selected for DRAG_AND_DROP transition.")
+                return
+
+            drop_image_path = filedialog.askopenfilename(
+                title="Select Drop Image",
+                filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp"), ("All Files", "*.*")]
+            )
+            if drop_image_path:
+                transition.drop_image = drop_image_path
+                print(f"[INFO] Drop Image set to: {drop_image_path}")
+            else:
+                print("[INFO] No drop image selected for DRAG_AND_DROP transition.")
+                return
+        
+        if hasattr(transition, "input_type_frame"):
+            transition.input_type_frame.destroy()
+            del transition.input_type_frame
 
         self.draw_graph()
 
@@ -656,26 +753,7 @@ class App(ctk.CTk):
         # Draw nodes
         node_radius = 20
         for node, (x, y) in node_positions.items():
-            if hasattr(node, "image") and node.image:
-                try:
-                    original_image = Image.open(node.image)
-                    resized_image = original_image.resize((node_radius * 2, node_radius * 2), Image.Resampling.LANCZOS)
-                    image = ImageTk.PhotoImage(resized_image)
-
-                    node.tk_image = image
-                    self.canva.create_image(x, y, image=image, tags=node.name)
-                except Exception as e:
-                    print(f"[WARNING] Could not load image for node {node.name}: {e}")
-                    self.canva.create_oval(
-                        x - node_radius, y - node_radius, x + node_radius, y + node_radius,
-                        fill="lightblue", outline="black", width=2, tags=node.name
-                    )
-            else:
-                self.canva.create_oval(
-                    x - node_radius, y - node_radius, x + node_radius, y + node_radius,
-                    fill="lightblue", outline="black", width=2, tags=node.name
-                )
-            self.canva.create_text(x, y, text=node.name, font=("Arial", 12), tags=node.name)
+            self.draw_node(node, x, y, node_radius)
     
         # Draw transitions
         for node in self.graph.nodes:
@@ -696,11 +774,7 @@ class App(ctk.CTk):
     
                 # Adjust positions for multiple edges
                 if node == transition.destination:  # Self-loop
-                    self.canva.create_arc(
-                        x1 - node_radius - offset, y1 - node_radius - offset,
-                        x1 + node_radius + offset, y1 + node_radius + offset,
-                        start=0, extent=300, style="arc", outline="black", width=2
-                    )
+                    self.draw_transition(x1, y1, x1, y1, transition.action, transition, is_self_loop=True, offset=node_radius + 10)
                 else:
                     dx = x2 - x1
                     dy = y2 - y1
@@ -714,28 +788,58 @@ class App(ctk.CTk):
                     y1_adjusted = y1 + (dy / distance) * node_radius + perp_dy
                     x2_adjusted = x2 - (dx / distance) * node_radius + perp_dx
                     y2_adjusted = y2 - (dy / distance) * node_radius + perp_dy
+
+                    self.draw_transition(x1_adjusted, y1_adjusted, x2_adjusted, y2_adjusted, transition.action, transition)
     
-                    # Draw line with arrow
-                    self.canva.create_line(
-                        x1_adjusted, y1_adjusted, x2_adjusted, y2_adjusted, arrow="last", fill="black"
-                    )
+    """
+        Draw a node with an image or a circle
+    """
+    def draw_node(self, node, x, y, radius):
+        if hasattr(node, "image") and node.image:
+            node.tk_image = self.draw_image(node.image, x, y, size=(radius * 2, radius * 2))
+        else:
+            self.canva.create_oval(
+                x - radius, y - radius, x + radius, y + radius,
+                fill="lightblue", outline="black", width=2, tags=node.name
+            )
+        self.canva.create_text(x, y, text=node.name, font=("Arial", 12), tags=node.name)
 
-                    mid_x = (x1_adjusted + x2_adjusted) // 2
-                    mid_y = (y1_adjusted + y2_adjusted) // 2
+    """
+        Draws a transition with text and images
+    """
+    def draw_transition(self, x1, y1, x2, y2, action_text, transition, is_self_loop=False, offset=0):
+        if is_self_loop:
+            self.canva.create_arc(
+                x1 - offset, y1 - offset, x1 + offset, y1 + offset,
+                start=0, extent=300, style="arc", outline="black", width=2
+            )
+            text_x, text_y = x1, y1 - offset - 20
+        else:
+            self.canva.create_line(x1, y1, x2, y2, arrow="last", fill="black")
+            text_x, text_y = (x1 + x2) // 2, (y1 + y2) // 2
 
-                    action_text = transition.action.name if hasattr(transition.action, "name") else str(transition.action)
-                    self.canva.create_text(mid_x, mid_y, text=action_text, font=("Arial", 10), fill="blue")
+        self.canva.create_text(text_x, text_y, text=action_text, font=("Arial", 10), fill="black")
 
-                    try:
-                        if os.path.exists(transition.image):
-                            button_image = Image.open(transition.image)
-                            resized_button_image = button_image.resize((20, 20), Image.Resampling.LANCZOS)
-                            button_image_tk = ImageTk.PhotoImage(resized_button_image)
+        if action_text == "DRAG_AND_DROP":
+            transition.drag_image_tk = self.draw_image(transition.drag_image, text_x - 15, text_y - 20)
+            transition.drop_image_tk = self.draw_image(transition.drop_image, text_x + 15, text_y - 20)
+        elif action_text in ["CLICK", "DOUBLE_CLICK", "CLICK_AND_TYPE"]:
+            transition.tk_image = self.draw_image(transition.image, text_x, text_y - 20)
 
-                            self.canva.create_image(mid_x + 30, mid_y, image=button_image_tk)
-                            transition.tk_image = button_image_tk
-                    except Exception as e:
-                        print(f"[WARNING] Could not load button image for transition {node.name} to {transition.destination.name}: {e}")
+    """
+        Draw an image on the canvas at the specified coordinates
+    """
+    def draw_image(self, image_path, x, y, size=(20, 20)):
+        try:
+            if os.path.exists(image_path):
+                image = Image.open(image_path)
+                resized_image = image.resize(size, Image.Resampling.LANCZOS)
+                image_tk = ImageTk.PhotoImage(resized_image)
+                self.canva.create_image(x, y, image=image_tk)
+                return image_tk
+        except Exception as e:
+            print(f"[WARNING] Could not load image {image_path}: {e}")
+        return None
 
     # ==============================================================================================
     # TESTS TAB

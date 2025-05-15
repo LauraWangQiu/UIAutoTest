@@ -43,7 +43,7 @@ class GenerateGraph:
         self._executable_thread.join()
 
         self._stop_executable()
-        self.graph_io.write_graph(self.practical_graph_file, self.graph)
+        self.graph_io.write_graph(self.images_dir, self.practical_graph_file, self.graph)
         print("[INFO] graph has been saved to " + str(self.practical_graph_file))
 
     def _start_executable(self):
