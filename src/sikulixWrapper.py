@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from sikuli import Screen, Pattern, Key, KeyModifier
+from sikuli import Screen, Pattern, Key, KeyModifier, Settings
 
 
 
@@ -25,6 +25,8 @@ class SikulixWrapper:
     """
     def __init__(self):
         self.screen = Screen()
+        Settings.MinTargetSize = 0.5  
+        Settings.MaxTargetSize = 2.0  
 
     def search_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction = 0.1 ):
         """

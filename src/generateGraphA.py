@@ -157,14 +157,14 @@ class GenerateGraph:
                     continue
                 candidate_image_path = os.path.join(candidate_path, candidate_images[0])
                 print("[DFS] Probando si la pantalla coincide con: " + str(candidate_image_path))
-                if self.sikuli.search_image(candidate_image_path, timeout=0.2):
+                if self.sikuli.search_image(candidate_image_path, timeout=0.0001,retries=20,similarity_reduction= 0.005):
                     dest_state_path = candidate_path
                     print("[DFS] La pantalla coincide con el estado: " + str(dest_state_path))
                     break
 
             if dest_state_path is not None:
                 print("[DFS] Creando transicion desde nodo: " + str(node) + " con imagen: " + str(btn_path))
-                transition = Transition(node)
+                transition = Transition(node)   
                 transition.image = btn_path
                 node.add_transition(transition)
                 print("[DFS] Transicion anadida. Llamando recursivamente a _dfs_state con destino: " + str(dest_state_path))
@@ -184,7 +184,7 @@ class GenerateGraph:
         print("[NAVIGATE] Reproduciendo la secuencia de clicks: " + str(clicks_path))
         for idx, btn_path in enumerate(clicks_path):
             print("[NAVIGATE] (" + str(idx+1) + "/" + str(len(clicks_path)) + ") Haciendo click en: " + str(btn_path))
-            self.sikuli.click_image(btn_path, timeout=timeout)
+            self.sikuli.click_image(btn_path, timeout=timeout,retries=8,similarity_reduction= 0.05)
         print("[NAVIGATE] Secuencia de clicks completada.")
 
 
@@ -223,7 +223,7 @@ class GenerateGraph:
         print("[INPUT_SIKULI] Transitions: ", node.transitions)
         transition.image = image_path
         node.add_transition(transition)
-        self.sikuli.click_image(image_path, timeout=0.001)
+        self.sikuli.click_image(image_path, timeout=0.001,retries=8,similarity_reduction= 0.05)
         if image_path not in visited_images:
             visited_images.add(image_path)
 
