@@ -48,7 +48,7 @@ pip install -r requirements.txt
 ## Try it
 
 ```ps
-java -cp "sikulixapi-2.0.5.jar;jython-standalone-2.7.4.jar" org.python.util.jython test_script.py
+java -cp "sikulixapi-2.0.5.jar;jython-standalone-2.7.4.jar" org.python.util.jython .\src\generateGraphA.py
 ```
 
 ```ps

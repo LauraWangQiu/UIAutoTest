@@ -123,7 +123,21 @@ class Graph:
         n = Node(name)
         self.nodes.append(n)
         return n
-        
+    
+    """
+        Adds a node to the graph with an image.
+        Returns the new node or None if the node already exists.
+    """
+    def add_node_with_image(self, name, image_path):
+        print("[INFO] Adding node with image: " + image_path)
+        for node in self.nodes:
+            if node.name == name:
+                print("[INFO] Node with name '" + name + "' already exists.")
+                return None  
+        n = Node(name)
+        n.set_image(image_path)
+        self.nodes.append(n)
+        return n        
     
     """
         Removes the node from the graph and removes all transitions pointing to it
