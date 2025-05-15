@@ -1,5 +1,1 @@
 v main_menu_sc.png None
-v brownie_menu_sc.png None
-e None brownie_menu_sc.png brownie_menu_sc.png
-v galletas_menu_sc.png None
-e None galletas_menu_sc.png galletas_menu_sc.png

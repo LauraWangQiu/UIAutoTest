@@ -80,71 +80,75 @@ class GenerateGraph:
             self.process = None
 
     def _loop(self):
-
-        print("[LOOP] Iniciando bucle de generación de grafo...")
+        print("[LOOP] Starting graph generation loop...")
         actual_path = os.getcwd()
         self_path = os.path.join(actual_path, "imgs", "self_nodes")
         generated_path = os.path.join(actual_path, "imgs", "generated_nodes")
-        # set to save the visited folders
-        visited_images = set()  
-        all_images = set([i for i, _, _ in os.walk(self_path) if os.path.isfile(i)]) # All images in self_path
-        while not self._stop_loop.is_set():
-            end_loop = False # Flag to end the loop
+        visited_images = set()
+        all_images = set([i for i, _, _ in os.walk(self_path) if os.path.isfile(i)])
+
+        while not self._stop_loop.is_set(): #mientras que no se haya terminado 
+            end_loop = False
             print("[LOOP] Restarting loop...")
-            # Restart the executable.
-            if self.process is None:
-            	self._executable_thread = threading.Thread(target=self._start_executable)
-                self._executable_thread.start()
-            time.sleep(self.delay_ms)  # Espera antes de volver a iterar
+            self._ensure_executable_running() #asegurarse de que el ejecutable esta corriendo
+            time.sleep(self.delay_ms)
             try:
-                while not end_loop:
+                while not end_loop: # mientras que no termine el bucle
                     print("[LOOP] Trying branch...")
-                    found_node = False
-                    for file in os.listdir(self_path):
-                        state_path = os.path.join(self_path, file)
-                        image_menu = [f for f in os.listdir(state_path) if os.path.isfile(os.path.join(state_path, f))]
-                        # If screen si the same as image_menu[0]
-                        if self.sikuli.search_image(os.path.join(state_path, image_menu[0]), timeout=0.001):  
-                            print("[LOOP] Founded screen: " + image_menu[0])
-                            found_node = True
-                            node = self.graph.get_node(image_menu[0])
-                            print("[LOOP] Node founded: " + str(node))
-                            if node is not None: # IF node is already in graph
-                                print("[LOOP] Node already in graph: " + image_menu[0])
-                                if self.input_sikuli(os.path.join(state_path, "buttons"), node) is None:
-                                    print("[LOOP] No transitions to visit.")
-                                    end_loop = True                            
-                                continue
-                            
-
-                            new_node = Node(image_menu[0]) # Creates a new node
-                            new_node.set_image(os.path.join(state_path, image_menu[0])) # Sets the image
-                            self.graph.add_node(new_node.name)
-                            print("[LOOP] New node added: " + new_node.name)
-                            self.input_sikuli(os.path.join(state_path, "buttons"), new_node)
-                            visited_images.add(state_path)  # Add the folder to the visited folders
-
+                    found_node = self._process_states(self_path, visited_images)
                     if not found_node:
-                        self.sikuli.capture_error("error_wait_.png")
-                        self.graph.add_node("NewNode")
+                        self._handle_no_node_found(self_path)
+                    if self._should_end_loop(visited_images, all_images):
+                        print("[LOOP] All images visited, ending loop.")
+                        end_loop = True
+                        self._stop_loop.set()
             except Exception as e:
                 print("[LOOP] Error: " + str(e))
                 end_loop = True
                 self._stop_loop.set()
                 break
-            # Close game
-            if self.process is not None:
-                self._stop_executable()
-                
+            self._close_executable_if_needed()
+        print("[LOOP] Graph loop finished.")
 
-            # If graph has visited all images, end the loop
-            if len(visited_images) >= len(all_images):
-                print("[LOOP] All images visited, ending loop.")
-                end_loop = True
-                self._stop_loop.set()
-        if found_node and self.actual_node is None:
-            pass
-        print("[LOOP] Bucle de grafo terminado.")  
+    def _ensure_executable_running(self):
+        if self.process is None:
+            self._executable_thread = threading.Thread(target=self._start_executable)
+            self._executable_thread.start()
+
+    def _process_states(self, self_path, visited_images):
+        found_node = False
+        for file in os.listdir(self_path):
+            state_path = os.path.join(self_path, file)
+            image_menu = [f for f in os.listdir(state_path) if os.path.isfile(os.path.join(state_path, f))]
+            if self.sikuli.search_image(os.path.join(state_path, image_menu[0]), timeout=0.001):
+                print("[LOOP] Found screen: " + image_menu[0])
+                found_node = True
+                node = self.graph.get_node(image_menu[0])
+                print("[LOOP] Node found: " + str(node))
+                if node is not None:
+                    print("[LOOP] Node already in graph: " + image_menu[0])
+                    if self.input_sikuli(os.path.join(state_path, "buttons"), node) is None:
+                        print("[LOOP] No transitions to visit.")
+                        return found_node
+                    continue
+                new_node = Node(image_menu[0])
+                new_node.set_image(os.path.join(state_path, image_menu[0]))
+                self.graph.add_node(new_node.name)
+                print("[LOOP] New node added: " + new_node.name)
+                self.input_sikuli(os.path.join(state_path, "buttons"), new_node)
+                visited_images.add(state_path)
+        return found_node
+
+    def _handle_no_node_found(self, self_path):
+        self.sikuli.capture_error("error_wait_.png")
+        self.graph.add_node("NewNode")
+
+    def _should_end_loop(self, visited_images, all_images):
+        return len(visited_images) >= len(all_images)
+
+    def _close_executable_if_needed(self):
+        if self.process is not None:
+            self._stop_executable()
 
     """
         Method to check if a transition has been visited. 
