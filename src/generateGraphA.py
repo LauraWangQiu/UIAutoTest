@@ -18,7 +18,8 @@ class GenerateGraph:
         self.selected_executable = selected_executable
         self.graph = Graph()
         self.node_inputs = []
-        self.delay_ms = 3   # Ahora en segundos para simplificar con time.sleep
+        self.delay_ms = 5   # Ahora en segundos para simplificar con time.sleep
+        self.tys_main_loop=6
         self.actual_node = None
         self.start_node = None
         self.process = None
@@ -94,6 +95,7 @@ class GenerateGraph:
         
         print("[LOOP] All images: " + str(len(all_images)))
 
+        loop_trays = 0
         while not self._stop_loop.is_set(): #mientras que no se haya terminado 
             end_loop = False
             print("[LOOP] Restarting loop...")
@@ -105,9 +107,14 @@ class GenerateGraph:
                     found_node = self._process_states(self_path, visited_images)
                     if not found_node:
                         self._handle_no_node_found(self_path)
+                        loop_trays += 1
                         end_loop = True
                     if self._should_end_loop(visited_images, all_images):
                         print("[LOOP] All images visited, ending loop.")
+                        end_loop = True
+                        self._stop_loop.set()
+                    if loop_trays >= self.tys_main_loop:
+                        print("[LOOP] Loop trays exceeded, ending loop.")
                         end_loop = True
                         self._stop_loop.set()
             except Exception as e:
@@ -148,15 +155,16 @@ class GenerateGraph:
                     self.graph.add_node_with_image(name=image_menu,image_path=os.path.join(state_path, image_menu))
                     new_node = self.graph.get_node(image_menu)
                     print("[LOOP] New node added: " + new_node.name)
-                    self.input_sikuli(os.path.join(state_path, "buttons"), new_node)
-                    visited_images.add(state_path)  # Add the folder to the visited files.
+                    self.input_sikuli(os.path.join(state_path, "buttons"), new_node, visited_images)
+                    if state_path not in visited_images:
+                        visited_images.add(state_path)  # Add the folder to the visited files.
                 else:
                     # If node is already in the graph, check if it has an unused transition.
                     print("[LOOP] Node already in graph: " + image_menu)
                     path = self.check_transition(os.path.join(state_path, "buttons", "click"), node)
                     if path is not None:
                         print("[LOOP] Found unused transition, clicking...")
-                        self.click(path, node)
+                        self.click(path, node, visited_images)
                         time.sleep(self.delay_ms)
                     else:
                         print("[LOOP] All transitions visited, moving to next branch.")
@@ -170,6 +178,8 @@ class GenerateGraph:
 
     def _should_end_loop(self, visited_images, all_images):
         print("[LOOP] Checking if loop should end...")
+        print("[LOOP] Visited images: " + str(len(visited_images)))
+        print("[LOOP] All images: " + str(len(all_images)))
         return len(visited_images) >= len(all_images)
 
     def _close_executable_if_needed(self, visited_images, all_images, found_node):
@@ -190,12 +200,12 @@ class GenerateGraph:
     """
         Method to check if a transition has been visited. 
     """
-    def input_sikuli(self, buttons_path, node):
+    def input_sikuli(self, buttons_path, node, visited_images):
         print("[INPUT_SIKULI] Iniciando input_sikuli...")
         path = self.check_transition(os.path.join(buttons_path,"click"), node) 
         print("[INPUT_SIKULI] Path: " + str(path))
         if path is not None:
-            self.click(path, node)
+            self.click(path, node, visited_images)
         else:
             return None
 
@@ -220,16 +230,18 @@ class GenerateGraph:
     """
         Clicks on the images in the given path.
     """
-    def click(self, image_path, node):
+    def click(self, image_path, node, visited_images):
         print("[INPUT_SIKULI] Clicking on image: " + image_path)
         transition = Transition(node)
         print("[INPUT_SIKULI] Transitions: ", node.transitions)
         transition.image = image_path
         node.add_transition(transition)
         self.sikuli.click_image(image_path, timeout=0.001)
+        if image_path not in visited_images:
+            visited_images.add(image_path)
 
 if __name__ == "__main__":
     base_path = os.path.dirname(os.path.abspath(__file__))  # Obtiene el directorio actual del script
-    executable_path = os.path.join(base_path, "../bin/Cooking Bibble/Cooking Bibble.exe")  # Ruta relativa
+    executable_path = os.path.join(base_path, "../bin/Sample/My project.exe")  # Ruta relativa
     generator = GenerateGraph(executable_path)
     generator.generate_graph()
