@@ -6,7 +6,7 @@ class TotalConnectTest(Test):
         self.graph = graph
         self.graph_f = graph_file 
         # Variables and modifiable parameters:
-        self.visited_nodes = set()
+        self.visited_states = set()
         self.visited_transitions = set()
 
     """
@@ -14,7 +14,7 @@ class TotalConnectTest(Test):
     """
     def run(self):
         print("Running " + self.name + ".")
-        # self.visited_nodes.clear()
+        # self.visited_states.clear()
         # self.visited_transitions.clear()
         # # Do something with the generated graph:
         # self.execute_test()
@@ -26,10 +26,10 @@ class TotalConnectTest(Test):
 
     # Visit all the nodes from node.
     def visit_nodes(self, node):
-        if node in self.visited_nodes:
+        if node in self.visited_states:
             return
 
-        self.visited_nodes.add(node)
+        self.visited_states.add(node)
 
         for transition in node.transitions:
            if transition not in self.visited_transitions:
@@ -46,13 +46,13 @@ class TotalConnectTest(Test):
             with open(graph_file, "w") as file:
                 file.write("Total Connectivity Test:\n")
                 # Nodes.
-                if len(self.visited_nodes) == len(self.graph.nodes):
+                if len(self.visited_states) == len(self.graph.nodes):
                     file.write("--There are no non-visited nodes.")
                     pass
                 else:
                     file.write("--Non-visited nodes: \n")
                     for node in self.graph.nodes:
-                        if node not in self.visited_nodes:
+                        if node not in self.visited_states:
                             file.write(node.name + "\n")
                 # Transitions.
                 file.write("--Non-visited transitions: \n")

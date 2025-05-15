@@ -8,12 +8,11 @@ import inspect
 import importlib.util
 import customtkinter as ctk
 import tkinter.ttk as ttk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from tkinter.scrolledtext import ScrolledText
-from tkinter import messagebox
+from PIL import Image, ImageTk
 from test import Test
-from graphsDef import Graph
-from graphsDef import Transition
+from graphsDef import Graph, Transition
 import GraphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
 
@@ -38,18 +37,18 @@ class App(ctk.CTk):
                 executable_delay,
                 tests_to_run,
                 headless=False):
-        self.java_path = java_path
-        self.jython_jar = jython_jar
-        self.sikulix_jar = sikulix_jar
-        self.sikuli_script = sikuli_script
-        self.jython_process = None
-        self.jython_thread = None
+        self.java_path = java_path                          # Path to Java executable
+        self.jython_jar = jython_jar                        # Path to Jython jar file
+        self.sikulix_jar = sikulix_jar                      # Path to SikuliX jar file
+        self.sikuli_script = sikuli_script                  # Path to Sikuli script
+        self.jython_process = None                          # Jython process
+        self.jython_thread = None                           # Jython thread
 
-        self.graph_io = GraphIO()       # GraphIO instance
-        self.graph = Graph()            # Theoric graph
-        self.graph_exe = Graph()        # Practical graph
-        self.theorical_graph_file   = theorical_graph_file
-        self.practical_graph_file   = practical_graph_file
+        self.graph_io = GraphIO()                           # GraphIO instance
+        self.graph = Graph()                                # Theorical graph
+        self.graph_exe = Graph()                            # Practical graph
+        self.theorical_graph_file   = theorical_graph_file  # Theoretical graph file
+        self.practical_graph_file   = practical_graph_file  # Practical graph file
         self.images_dir             = images_dir            # Directory of images
         self.tests_dir              = tests_dir             # Directory of tests
         self.test_classes = self.get_test_classes()
@@ -61,6 +60,7 @@ class App(ctk.CTk):
         if self.headless:
             print("[INFO] Application initialized in headless mode")
             self.load_graph_from_file(self.theorical_graph_file)
+            self.generate_graph_from_executable()
             self.run_tests()
         else: 
             super().__init__()
@@ -146,14 +146,13 @@ class App(ctk.CTk):
         # Left panel: title
         title_label = ctk.CTkLabel(self.left_panel, text="States Configuration", font=ctk.CTkFont(size=16, weight="bold"))
         title_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        # save graph button
+        # Left panel: save graph button
         save_graph_button = ctk.CTkButton(
             self.left_panel, 
             text="Save Graph", 
             command=self.save_graph_to_file)
         save_graph_button.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
-
-        # load graph button
+        # Left panel: load graph button
         load_graph_button = ctk.CTkButton(
             self.left_panel, 
             text="Load Graph", 
@@ -163,7 +162,7 @@ class App(ctk.CTk):
         add_node_button = ctk.CTkButton(self.left_panel, text="Add State", command=self.add_node)
         add_node_button.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: button to remove nodes
-        remove_node_button = ctk.CTkButton(self.left_panel, text="Remove Selected State/s", command=self.remove_selected_nodes)
+        remove_node_button = ctk.CTkButton(self.left_panel, text="Remove Selected State(s)", command=self.remove_selected_nodes)
         remove_node_button.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: Clear button
         clear_button = ctk.CTkButton(
@@ -217,21 +216,19 @@ class App(ctk.CTk):
         file_path = filedialog.askopenfilename(
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
-            title="Leer grafo desde archivo"
+            title="Read graph from file"
         )
         if file_path:
-           
+            self.clear_graph()
             self.graph = self.graph_io.load_graph(file_path, self.images_dir)
             self.node_frames_index = len(self.graph.nodes) + 1
-            # Limpiar los frames existentes
-            for frame, edit_frame in self.node_frames:
-                frame.destroy()
-                if edit_frame:
-                    edit_frame.destroy()
-            self.node_frames.clear()
-            # Volver a crearlos
+            
+            # Create frames for each node in the loaded graph
             for idx, node in enumerate(self.graph.nodes, 1):
                 self.create_node_frame(node, idx)
+            # Create the transitions list for each node
+            for node in self.graph.nodes:
+                self.update_transitions_list(node)
             self.draw_graph()
             self.nodes_canvas.grid()
             self.nodes_scrollbar.grid()
@@ -295,11 +292,22 @@ class App(ctk.CTk):
 
         node.transitions_list_frame = transitions_list_frame
 
+        # Add "+" button
         add_button = ctk.CTkButton(edit_frame, text="+", width=30, command=lambda n=node: self.add_connection(n))
         add_button.grid(row=3, column=0, padx=5, pady=5, sticky="w")
 
+        # Add "-" button
         remove_button = ctk.CTkButton(edit_frame, text="-", width=30, command=lambda n=node: self.delete_last_transition(node))
         remove_button.grid(row=3, column=1, padx=5, pady=5, sticky="e")
+
+        # Add "Select Image" button
+        select_image_button = ctk.CTkButton(edit_frame, text="Select Image", command=lambda n=node: self.select_image_for_node(n))
+        select_image_button.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+
+        # Label to display the selected image path
+        image_label_text = f"Image: {os.path.basename(node.image)}" if hasattr(node, "image") and node.image else "No image selected"
+        node.image_label = ctk.CTkLabel(edit_frame, text=image_label_text, font=ctk.CTkFont(size=12))
+        node.image_label.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky="w")
 
         self.node_frames.append((frame, edit_frame))
 
@@ -440,6 +448,11 @@ class App(ctk.CTk):
                 )
                 move_down_button.pack(side="right", padx=2)
 
+        if node.transitions:
+            node.transitions_list_frame.grid()
+        else:
+            node.transitions_list_frame.grid_remove()
+
     """
         Add a connection to a node by creating a dropdown menu with available nodes
         The user can select a node from the menu to create a transition
@@ -518,6 +531,21 @@ class App(ctk.CTk):
         self.draw_graph()
 
     """
+        Select an image for the node using a file dialog
+    """
+    def select_image_for_node(self, node):
+        file_path = filedialog.askopenfilename(
+            title="Select Image",
+            filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp"), ("All Files", "*.*")]
+        )
+        if file_path:
+            node.image = file_path
+            print(f"[INFO] Selected image for node {node.name}: {file_path}")
+            node.image_label.configure(text=f"Image: {os.path.basename(file_path)}")
+
+            self.draw_graph()
+
+    """
         Remove the selected nodes from the graph and update the graph
     """
     def remove_selected_nodes(self):
@@ -563,20 +591,26 @@ class App(ctk.CTk):
             message="Are you sure you want to delete the entire graph? This action cannot be undone"
         )
         if confirm:
-            self.graph.clear()
+            self.clear_graph()
 
-            for frame, edit_frame in self.node_frames:
-                frame.destroy()
-                if edit_frame:
-                    edit_frame.destroy()
-            self.node_frames.clear()
+    """
+        Clear the entire graph and all nodes
+    """
+    def clear_graph(self):
+        self.graph.clear()
 
-            self.nodes_canvas.grid_remove()
-            self.nodes_scrollbar.grid_remove()
+        for frame, edit_frame in self.node_frames:
+            frame.destroy()
+            if edit_frame:
+                edit_frame.destroy()
+        self.node_frames.clear()
 
-            self.node_frames_index = 1
+        self.nodes_canvas.grid_remove()
+        self.nodes_scrollbar.grid_remove()
 
-            self.draw_graph()
+        self.node_frames_index = 1
+
+        self.draw_graph()
 
     """
         Handle mouse wheel scrolling for the canvas
@@ -623,10 +657,25 @@ class App(ctk.CTk):
         # Draw nodes
         node_radius = 20
         for node, (x, y) in node_positions.items():
-            self.canva.create_oval(
-                x - node_radius, y - node_radius, x + node_radius, y + node_radius,
-                fill="lightblue", outline="black", width=2, tags=node.name
-            )
+            if hasattr(node, "image") and node.image:
+                try:
+                    original_image = Image.open(node.image)
+                    resized_image = original_image.resize((node_radius * 2, node_radius * 2), Image.Resampling.LANCZOS)
+                    image = ImageTk.PhotoImage(resized_image)
+
+                    node.tk_image = image
+                    self.canva.create_image(x, y, image=image, tags=node.name)
+                except Exception as e:
+                    print(f"[WARNING] Could not load image for node {node.name}: {e}")
+                    self.canva.create_oval(
+                        x - node_radius, y - node_radius, x + node_radius, y + node_radius,
+                        fill="lightblue", outline="black", width=2, tags=node.name
+                    )
+            else:
+                self.canva.create_oval(
+                    x - node_radius, y - node_radius, x + node_radius, y + node_radius,
+                    fill="lightblue", outline="black", width=2, tags=node.name
+                )
             self.canva.create_text(x, y, text=node.name, font=("Arial", 12), tags=node.name)
     
         # Draw transitions
@@ -671,6 +720,23 @@ class App(ctk.CTk):
                     self.canva.create_line(
                         x1_adjusted, y1_adjusted, x2_adjusted, y2_adjusted, arrow="last", fill="black"
                     )
+
+                    mid_x = (x1_adjusted + x2_adjusted) // 2
+                    mid_y = (y1_adjusted + y2_adjusted) // 2
+
+                    action_text = transition.action.name if hasattr(transition.action, "name") else str(transition.action)
+                    self.canva.create_text(mid_x, mid_y, text=action_text, font=("Arial", 10), fill="blue")
+
+                    try:
+                        if os.path.exists(transition.image):
+                            button_image = Image.open(transition.image)
+                            resized_button_image = button_image.resize((20, 20), Image.Resampling.LANCZOS)
+                            button_image_tk = ImageTk.PhotoImage(resized_button_image)
+
+                            self.canva.create_image(mid_x + 30, mid_y, image=button_image_tk)
+                            transition.tk_image = button_image_tk
+                    except Exception as e:
+                        print(f"[WARNING] Could not load button image for transition {node.name} to {transition.destination.name}: {e}")
 
     # ==============================================================================================
     # TESTS TAB
@@ -760,7 +826,7 @@ class App(ctk.CTk):
     """
     def add_test_runner_tab(self):
         test_runner_tab = ctk.CTkFrame(self.tab_control)
-        self.tab_control.add(test_runner_tab, text="Run Tests & Compare")
+        self.tab_control.add(test_runner_tab, text="Generate, Run & Compare")
 
         # Entry to display the selected executable path
         self.executable_entry = ctk.CTkEntry(test_runner_tab, state="readonly", font=ctk.CTkFont(size=12))
@@ -779,6 +845,10 @@ class App(ctk.CTk):
         # Button to select images directory
         select_images_dir_button = ctk.CTkButton(test_runner_tab, text="Select Images Directory", command=self.select_images_dir)
         select_images_dir_button.pack(fill="x", padx=10, pady=5)
+
+        # Button to generate the graph from executable
+        generate_graph_button = ctk.CTkButton(test_runner_tab, text="Generate Graph from Executable", command=self.generate_graph_from_executable)
+        generate_graph_button.pack(fill="x", padx=10, pady=5)
 
         # Title
         title_label = ctk.CTkLabel(test_runner_tab, text="Select Tests to Run", font=ctk.CTkFont(size=16, weight="bold"))
@@ -832,16 +902,21 @@ class App(ctk.CTk):
             self.images_dir_entry.configure(state="readonly")
 
     """
-        Run the selected tests.
+        Generate the graph from the selected executable calling the Jython script
     """
-    def run_tests(self):
+    def generate_graph_from_executable(self):
         if not self.selected_executable:
             print("[ERROR] No executable selected. Please select an executable first.")
             return
         
+        self.run_jython()
+
+    """
+        Run the selected tests.
+    """
+    def run_tests(self):
         # If headless mode, then run tests specified from file
         # else, run tests from the GUI
-
         selected_test_classes = []
 
         if self.headless:
@@ -860,8 +935,6 @@ class App(ctk.CTk):
             print("[INFO] No tests selected")
             return
         
-        self.run_jython()
-
         self.check_jython_thread(selected_test_classes)
 
     """
@@ -925,6 +998,9 @@ class App(ctk.CTk):
 
         _check()
 
+    """
+        Execute the selected tests
+    """
     def execute_tests(self, selected_test_classes):
         for test_class_ref in selected_test_classes:
             test_instance = test_class_ref(self.graph_io.load_graph(self.practical_graph_file, self.images_dir))
