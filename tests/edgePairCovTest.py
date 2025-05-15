@@ -13,3 +13,14 @@ class EdgePairCovTest(Test):
     def run(self):
         print("Running " + self.name + ".")
         # Do something with the generated graph
+
+        for node in self.graph.nodes:
+            edge_count = {}
+            for transitions in node.transitions:
+                dest_name = transitions.destination.name #Destination of the node
+                edge_count[dest_name] = edge_count.get(dest_name, 0) + 1
+                for dest_name, count in edge_count.items():
+                    if count > 1:
+                        if (node.name, dest_name) not in self.EdgePairCovList:
+                            self.EdgePairCovList[(node.name, dest_name)] = count
+                            print(f"Multiple transitions ({count}) from '{node.name}' to '{dest_name}'")
