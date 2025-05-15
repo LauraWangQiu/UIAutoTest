@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-# generateGraph.py ARREGLADO
+# generateGraph.py ARREGLADO - DFS Recursivo
 
 import subprocess
 import os
-import shutil
 import threading
 import time
 from sikulixWrapper import SikulixWrapper
@@ -18,8 +17,7 @@ class GenerateGraph:
         self.selected_executable = selected_executable
         self.graph = Graph()
         self.node_inputs = []
-        self.delay_ms = 5   # Ahora en segundos para simplificar con time.sleep
-        self.tys_main_loop=6
+        self.delay_ms = 5
         self.actual_node = None
         self.start_node = None
         self.process = None
@@ -31,17 +29,15 @@ class GenerateGraph:
 
     def generate_graph(self):
         print("Generating graph for " + str(self.selected_executable))
-        self._executable_thread = threading.Thread()
+        self._executable_thread = threading.Thread(target=self._start_executable)
         self._executable_thread.start()
 
         self._loop_thread = threading.Thread(target=self._loop)
         self._loop_thread.start()
 
-        # Espera a que termine el bucle
         self._loop_thread.join()
         self._executable_thread.join()
 
-        # when the loop ends, we can save the graph
         self._stop_executable()
         self.graph_io.write_graph("output_graph.txt", self.graph)
         print("[INFO] graph has been saved to output_graph.txt")
@@ -50,22 +46,19 @@ class GenerateGraph:
         try:
             print("[INFO] Starting executable: " + str(self.selected_executable))
             self.process = subprocess.Popen([self.selected_executable])
-            self.process.wait()  # Espera a que termine el proceso
+            self.process.wait()
             print("[INFO] Executable terminado.")
         except FileNotFoundError:
             print("[INFO] Executable not found: " + str(self.selected_executable))
             self.process = None
-        
-    """
-        Forces the executable to close.
-    """
+
     def _stop_executable(self):
         try:
             if self.process is not None:
                 print("[INFO] Stopping executable: " + str(self.selected_executable))
                 self.process.terminate()
                 try:
-                    self.process.wait(timeout=5)  # Waits 5 seconds to terminate.
+                    self.process.wait(timeout=5)
                 except Exception:
                     print("[INFO] Forcing the executable to stop...")
                     self.process.kill()
@@ -77,129 +70,121 @@ class GenerateGraph:
                 self._executable_thread.join(timeout=5)
                 print("[INFO] Executable thread ended.")
         except Exception as e:
-            print("[ERROR] Error on closing executable: "+e)
+            print("[ERROR] Error on closing executable: "+str(e))
             self.process = None
 
+    # --- DFS recursivo ---
     def _loop(self):
-        print("[LOOP] Starting graph generation loop...")
+        print("[LOOP] Starting DFS graph generation loop...")
         actual_path = os.getcwd()
         self_path = os.path.join(actual_path, "imgs", "self_nodes")
-        generated_path = os.path.join(actual_path, "imgs", "generated_nodes")
-        visited_images = set()
-        all_images = set(
-            os.path.join(root, file)
-            for root, _, files in os.walk(self_path)
-            for file in files
-            if os.path.splitext(file)[1].lower() in self.valid_extensions
-            )
-        
-        print("[LOOP] All images: " + str(len(all_images)))
+        visited_states = set()
+        # Primer estado (elige uno, por ejemplo el primero encontrado)
+        state_folders = [os.path.join(self_path, d) for d in os.listdir(self_path) if os.path.isdir(os.path.join(self_path, d))]
+        if not state_folders:
+            print("[LOOP] No states found.")
+            return
+        self._ensure_executable_running()
+        time.sleep(self.delay_ms)
+        start_state = state_folders[0]
+        self._dfs_state(start_state, visited_states, self_path,[])
+        print("[LOOP] DFS graph loop finished.")
+        self._stop_loop.set()
 
-        loop_trays = 0
-        while not self._stop_loop.is_set(): #mientras que no se haya terminado 
-            end_loop = False
-            print("[LOOP] Restarting loop...")
-            self._ensure_executable_running() #asegurarse de que el ejecutable esta corriendo
-            time.sleep(self.delay_ms)
-            try:
-                while not end_loop: # mientras que no termine el bucle
-                    print("[LOOP] Trying branch...")
-                    found_node = self._process_states(self_path, visited_images)
-                    if not found_node:
-                        self._handle_no_node_found(self_path)
-                        loop_trays += 1
-                        end_loop = True
-                    if self._should_end_loop(visited_images, all_images):
-                        print("[LOOP] All images visited, ending loop.")
-                        end_loop = True
-                        self._stop_loop.set()
-                    if loop_trays >= self.tys_main_loop:
-                        print("[LOOP] Loop trays exceeded, ending loop.")
-                        end_loop = True
-                        self._stop_loop.set()
-            except Exception as e:
-                print("[LOOP] Error: " + str(e))
-                end_loop = True
-                self._stop_loop.set()
-                break
-            self._close_executable_if_needed(visited_images, all_images, found_node)
-        print("[LOOP] Graph loop finished.")
+    def _dfs_state(self, state_path, visited_states, base_path, clicks_path):
+        if state_path in visited_states: #si visitado pasamos
+            print("[DFS] Estado ya visitado: " + str(state_path))
+            return
+        print("[DFS] Visitando estado: " + str(state_path))
+        visited_states.add(state_path)
+
+        # Buscar la imagen principal del estado (solo una, la primera encontrada)
+        images = [f for f in os.listdir(state_path)
+                if os.path.isfile(os.path.join(state_path, f)) and os.path.splitext(f)[1].lower() in self.valid_extensions]
+        print("[DFS] Imágenes encontradas en el estado: " + str(images))
+        if not images:
+            print("[DFS] No hay imagen principal en " + str(state_path))
+            return
+        image_menu = os.path.join(state_path, images[0])
+        print("[DFS] Imagen principal seleccionada: " + str(image_menu))
+
+        node = self.graph.get_node(image_menu)
+        print("[DFS] Nodo obtenido: " + str(node))
+        if node is None:
+            print("[DFS] Nodo no existe, se va a crear con imagen: " + str(image_menu))
+            self.graph.add_node_with_image(name=image_menu, image_path=image_menu)
+            node = self.graph.get_node(image_menu)
+            print("[DFS] Nodo creado: " + str(node))
+
+        # Carpeta de botones (transiciones)
+        buttons_click_path = os.path.join(state_path, "buttons", "click")
+        print("[DFS] Ruta de botones: " + str(buttons_click_path))
+        if not os.path.isdir(buttons_click_path):
+            print("[DFS] No hay carpeta de botones en " + str(buttons_click_path))
+            
+            self._stop_executable()
+            self._start_executable()
+            self.navigate_to_state(clicks_path)
+           
+            return
+
+        # Para cada botón de transición
+        buttons = [f for f in os.listdir(buttons_click_path) if os.path.isfile(os.path.join(buttons_click_path, f))]
+        print("[DFS] Botones encontrados: " + str(buttons))
+        for idx, btn in enumerate(buttons):
+            btn_path = os.path.join(buttons_click_path, btn)
+            print("[DFS] Simulando click en: " + str(btn_path))
+            self.sikuli.click_image(btn_path, timeout=0.01)
+            self.add_click_to_path(clicks_path,btn_path) #guardado de los clicks
+           
+            dest_state_path = None
+            for candidate_state in os.listdir(base_path):
+                candidate_path = os.path.join(base_path, candidate_state)
+                if not os.path.isdir(candidate_path):
+                    continue
+                candidate_images = [f for f in os.listdir(candidate_path)
+                                    if os.path.isfile(os.path.join(candidate_path, f)) and os.path.splitext(f)[1].lower() in self.valid_extensions]
+                if not candidate_images:
+                    continue
+                candidate_image_path = os.path.join(candidate_path, candidate_images[0])
+                print("[DFS] Probando si la pantalla coincide con: " + str(candidate_image_path))
+                if self.sikuli.search_image(candidate_image_path, timeout=0.2):
+                    dest_state_path = candidate_path
+                    print("[DFS] La pantalla coincide con el estado: " + str(dest_state_path))
+                    break
+
+            if dest_state_path is not None:
+                print("[DFS] Creando transicion desde nodo: " + str(node) + " con imagen: " + str(btn_path))
+                transition = Transition(node)
+                transition.image = btn_path
+                node.add_transition(transition)
+                print("[DFS] Transicion anadida. Llamando recursivamente a _dfs_state con destino: " + str(dest_state_path))
+                self._dfs_state(dest_state_path, visited_states, base_path, clicks_path)
+               
+            else:
+                print("[DFS] No se encuentra el estado destino para el boton " + str(btn))
+       
+
+    def add_click_to_path(self, clicks_path, btn_path):
+       
+        clicks_path.append(btn_path)
+        print("[PATH] Click anadido a la ruta: " + str(btn_path))
+
+    def navigate_to_state(self, clicks_path, timeout=2):
+        
+        print("[NAVIGATE] Reproduciendo la secuencia de clicks: " + str(clicks_path))
+        for idx, btn_path in enumerate(clicks_path):
+            print("[NAVIGATE] (" + str(idx+1) + "/" + str(len(clicks_path)) + ") Haciendo click en: " + str(btn_path))
+            self.sikuli.click_image(btn_path, timeout=timeout)
+        print("[NAVIGATE] Secuencia de clicks completada.")
+
 
     def _ensure_executable_running(self):
         if self.process is None:
             self._executable_thread = threading.Thread(target=self._start_executable)
             self._executable_thread.start()
 
-    def _process_states(self, self_path, visited_images):
-        found_node = False
-        
-        for file in os.listdir(self_path):
-            state_path = os.path.join(self_path, file)
-            print("[LOOP] Processing state: " + state_path)
-            f = [
-                file for file in os.listdir(state_path)
-                if os.path.isfile(os.path.join(state_path, file)) and
-                   os.path.splitext(file)[1].lower() in self.valid_extensions
-                ]
-            print("[LOOP] Files in state: " + str(f))
-            if len(f) <= 0:
-                print("[LOOP] No images found in state: " + state_path)
-                continue
-            image_menu = os.path.join(state_path, f[0])
-            print("[LOOP] Images in state: " + str(image_menu))
-            # If screen si the same as image_menu[0]
-            if self.sikuli.search_image(os.path.join(state_path, image_menu), timeout=0.001):  
-                found_node = True
-                node = self.graph.get_node(image_menu)
-                if node is None:
-                    self.graph.add_node_with_image(name=image_menu,image_path=os.path.join(state_path, image_menu))
-                    new_node = self.graph.get_node(image_menu)
-                    print("[LOOP] New node added: " + new_node.name)
-                    self.input_sikuli(os.path.join(state_path, "buttons"), new_node, visited_images)
-                    if state_path not in visited_images:
-                        visited_images.add(state_path)  # Add the folder to the visited files.
-                else:
-                    # If node is already in the graph, check if it has an unused transition.
-                    print("[LOOP] Node already in graph: " + image_menu)
-                    path = self.check_transition(os.path.join(state_path, "buttons", "click"), node)
-                    if path is not None:
-                        print("[LOOP] Found unused transition, clicking...")
-                        self.click(path, node, visited_images)
-                        time.sleep(self.delay_ms)
-                    else:
-                        print("[LOOP] All transitions visited, moving to next branch.")
-                        end_loop = True  # All transitions visited, end loop.
-                        return found_node
-        return found_node
-
-    def _handle_no_node_found(self, self_path):
-        self.sikuli.capture_error("error_wait_.png")
-        self.graph.add_node("NewNode")
-
-    def _should_end_loop(self, visited_images, all_images):
-        print("[LOOP] Checking if loop should end...")
-        print("[LOOP] Visited images: " + str(len(visited_images)))
-        print("[LOOP] All images: " + str(len(all_images)))
-        return len(visited_images) >= len(all_images)
-
-    def _close_executable_if_needed(self, visited_images, all_images, found_node):
-        print("[LOOP] Closing executable if needed...")
-        # Close game
-        if self.process is not None:
-            self._stop_executable()
-            
-        # If graph has visited all images, end the loop
-        if self._should_end_loop(visited_images, all_images):
-            print("[LOOP] All images visited, ending loop.")
-            end_loop = True
-            self._stop_loop.set()
-        if found_node and self.actual_node is None:
-            pass
-        print("[LOOP] Bucle de grafo terminado.")  
-
-    """
-        Method to check if a transition has been visited. 
-    """
+   
     def input_sikuli(self, buttons_path, node, visited_images):
         print("[INPUT_SIKULI] Iniciando input_sikuli...")
         path = self.check_transition(os.path.join(buttons_path,"click"), node) 
@@ -209,10 +194,6 @@ class GenerateGraph:
         else:
             return None
 
-    """
-        Method to check if the transition has been visited.
-        If it have a transition that has not been visited, it will return it, else return None.
-    """
     def check_transition(self, buttons_path, node):
         if not os.path.isdir(buttons_path):
             return None
@@ -224,12 +205,9 @@ class GenerateGraph:
                 return os.path.join(buttons_path, img_f)
             else:
                 print("[INPUT_SIKULI] Image found: " + img_f)
-        print("[INPUT_SIKULI] All thansitions visited.")
+        print("[INPUT_SIKULI] All transitions visited.")
         return None
 
-    """
-        Clicks on the images in the given path.
-    """
     def click(self, image_path, node, visited_images):
         print("[INPUT_SIKULI] Clicking on image: " + image_path)
         transition = Transition(node)

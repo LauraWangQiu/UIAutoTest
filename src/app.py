@@ -47,6 +47,9 @@ class App(ctk.CTk):
             self.delay_ms_tabs = 100
             self.delay_ms_executable = 1000
             self.after(self.delay_ms_tabs, self.create_tabs)
+        graph_io = GraphIO()        
+           
+        self.exegraph =  graph_io.load_graph(file_name, "imgs")
 
     def load_graph_from_file(self, file_name):
         try:

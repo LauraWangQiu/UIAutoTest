@@ -1,8 +1,5 @@
-v C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\A_menu\A_menu.png A_menu.png
-e None C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\A_menu\A_menu.png C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\A_menu\A_menu.png
-v C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\B_menu.png B_menu.png
-e None C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\B_menu.png C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\B_menu.png
-e None C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\B_menu.png C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\B_menu.png
-v C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\C_menu\C_menu.png C_menu.png
-v C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\D_menu\D_menu.png D_menu.png
-e None C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\D_menu\D_menu.png C:\Users\andres\Documents\GitHub\UIAutoTest\imgs\self_nodes\D_menu\D_menu.png
+v C:\Users\AliciaMoraVelasco\Documents\GitHub\UIAutoTest\imgs\self_nodes\A_menu\A_menu.png A_menu.png
+e None C:\Users\AliciaMoraVelasco\Documents\GitHub\UIAutoTest\imgs\self_nodes\A_menu\A_menu.png C:\Users\AliciaMoraVelasco\Documents\GitHub\UIAutoTest\imgs\self_nodes\A_menu\A_menu.png
+v C:\Users\AliciaMoraVelasco\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\b_menu.png b_menu.png
+e None C:\Users\AliciaMoraVelasco\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\b_menu.png C:\Users\AliciaMoraVelasco\Documents\GitHub\UIAutoTest\imgs\self_nodes\B_menu\b_menu.png
+v C:\Users\AliciaMoraVelasco\Documents\GitHub\UIAutoTest\imgs\self_nodes\C_menu\c_menu.png c_menu.png
