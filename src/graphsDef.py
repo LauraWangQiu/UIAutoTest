@@ -233,3 +233,12 @@ class Graph:
                 return True
         #print("[ERROR] Node '" + name + "' is not in the graph.")
         return False
+
+    def is_node_in_graph_image(self, image):
+        print("[INFO] Graph nodes: ", self.nodes)
+        for node in self.nodes:
+            if node.image is image:
+                #print("[INFO] Node '" + node.name + "' is in the graph.")
+                return True
+        #print("[ERROR] Node '" + name + "' is not in the graph.")
+        return False
