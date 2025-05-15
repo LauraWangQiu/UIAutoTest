@@ -17,7 +17,7 @@ class TotalConnectTest(Test):
         self.visited_transitions.clear()
         # Do something with the generated graph:
         self.execute_test()
-        self.write_solution() # TODO
+        self.write_solution()
 
     # Total Connectivity Test:
     def execute_test(self):
@@ -43,5 +43,11 @@ class TotalConnectTest(Test):
         Overrides the parent write_solution method
     """
     # TODO: PAIGRO HERE.
-    def write_solution(self):
-        pass
+    def write_solution(self, graph_file):
+        try:
+            with open(graph_file, "w") as file:
+                file.write("Total Connectivity Test:\n")
+        except Exception as e:
+            print("[ERROR] Exception while writing test data from: " + self.name + ". " + str(e))
+        else:
+            print("[INFO] Test data from: " + self.name + " successfully written to " + graph_file)

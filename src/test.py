@@ -21,5 +21,5 @@ class Test:
     """
         Method print to be implemented by subclasses.
     """
-    def write_solution(self):
+    def write_solution(self, graph_file):
         pass
