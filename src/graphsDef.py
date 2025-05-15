@@ -121,6 +121,7 @@ class Graph:
                 print("[INFO] Node with name '" + name + "' already exists.")
                 return None  
         n = Node(name)
+        print("NODEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE '" + name )
         self.nodes.append(n)
         return n
     

@@ -152,6 +152,8 @@ class GraphIO:
         print("[INFO] Writing graph to " + graph_file)
         try:
             with open(graph_file, "w") as f:
+                edge_lines = []
+                # Recorres nodos y escribes solo los vértices, pero acumulas edges
                 for node in graph.nodes:
                     image_name = os.path.basename(node.image) if node.image else "None"
                     f.write("v " + node.name + " " + image_name + "\n")
@@ -162,20 +164,21 @@ class GraphIO:
 
                         if act in ("CLICK", "DOUBLE_CLICK"):
                             image_name = os.path.basename(trans.image) if trans.image else "None"
-                            f.write("e " + act + " " + node.name + " " + dst + " " + image_name + "\n")
+                            edge_lines.append("e " + act + " " + node.name + " " + dst + " " + image_name + "\n")
 
                         elif act == "CLICK_AND_TYPE":
                             image_name = os.path.basename(trans.image) if trans.image else "None"
-                            f.write("e " + act + " " + node.name + " " + dst + " " + image_name + " " + trans.text + "\n")
+                            edge_lines.append("e " + act + " " + node.name + " " + dst + " " + image_name + " " + trans.text + "\n")
 
                         elif act == "DRAG_AND_DROP":
                             drag_image_name = os.path.basename(trans.drag_image) if trans.drag_image else "None"
                             drop_image_name = os.path.basename(trans.drop_image) if trans.drop_image else "None"
-                            f.write("e " + act + " " + node.name + " " + dst + " " + drag_image_name + " " + drop_image_name + "\n")
+                            edge_lines.append("e " + act + " " + node.name + " " + dst + " " + drag_image_name + " " + drop_image_name + "\n")
 
                         else:
-                            f.write("e " + act + " " + node.name + " " + dst + "\n")
-
+                            edge_lines.append("e " + act + " " + node.name + " " + dst + "\n")
+                # Escribes todas las aristas al final
+                f.writelines(edge_lines)
         except Exception as e:
             print("[ERROR] Exception while writing the graph: " + str(e))
         else:

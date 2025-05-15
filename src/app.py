@@ -141,29 +141,42 @@ class App(ctk.CTk):
         # Left panel
         self.left_panel = ctk.CTkFrame(self.split_frame)
         self.left_panel.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
-        self.left_panel.grid_rowconfigure(4, weight=1)
+        self.left_panel.grid_rowconfigure(6, weight=1)
         self.left_panel.grid_columnconfigure(0, weight=1)
         # Left panel: title
         title_label = ctk.CTkLabel(self.left_panel, text="States Configuration", font=ctk.CTkFont(size=16, weight="bold"))
         title_label.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        # save graph button
+        save_graph_button = ctk.CTkButton(
+            self.left_panel, 
+            text="Save Graph", 
+            command=self.save_graph_to_file)
+        save_graph_button.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+
+        # load graph button
+        load_graph_button = ctk.CTkButton(
+            self.left_panel, 
+            text="Load Graph", 
+            command=self.load_graph_from_dialog)
+        load_graph_button.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: button to add nodes
         add_node_button = ctk.CTkButton(self.left_panel, text="Add State", command=self.add_node)
-        add_node_button.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        add_node_button.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: button to remove nodes
         remove_node_button = ctk.CTkButton(self.left_panel, text="Remove Selected State/s", command=self.remove_selected_nodes)
-        remove_node_button.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+        remove_node_button.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: Clear button
         clear_button = ctk.CTkButton(
             self.left_panel,
             text="Clear",
             command=self.clear_graph_with_confirmation
         )
-        clear_button.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+        clear_button.grid(row=5, column=0, padx=10, pady=5, sticky="ew")
         # Left panel: subpanel to show all existing nodes with scrollbar
         self.nodes_canvas = ctk.CTkCanvas(self.left_panel, bg="#2b2b2b", highlightthickness=0)
-        self.nodes_canvas.grid(row=4, column=0, padx=10, pady=10, sticky="nsew")
+        self.nodes_canvas.grid(row=6, column=0, padx=10, pady=10, sticky="nsew")
         self.nodes_scrollbar = ctk.CTkScrollbar(self.left_panel, orientation="vertical", command=self.nodes_canvas.yview)
-        self.nodes_scrollbar.grid(row=4, column=1, sticky="ns", padx=(0, 10))
+        self.nodes_scrollbar.grid(row=6, column=1, sticky="ns", padx=(0, 10))
         self.nodes_canvas.configure(yscrollcommand=self.nodes_scrollbar.set)
         self.nodes_frame = ctk.CTkFrame(self.nodes_canvas)
         self.nodes_frame_id = self.nodes_canvas.create_window((0, 0), window=self.nodes_frame, anchor="nw")
@@ -188,7 +201,42 @@ class App(ctk.CTk):
         self.canva.bind("<Configure>", lambda event: self.on_canvas_resize(event)) # Resize
 
         self.draw_graph()
-    
+
+    def save_graph_to_file(self):
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            title="Guardar grafo en archivo"
+        )
+        if file_path:
+           
+            self.graph_io.write_graph(file_path, self.graph)
+           
+
+    def load_graph_from_dialog(self):
+        file_path = filedialog.askopenfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            title="Leer grafo desde archivo"
+        )
+        if file_path:
+           
+            self.graph = self.graph_io.load_graph(file_path, self.images_dir)
+            self.node_frames_index = len(self.graph.nodes) + 1
+            # Limpiar los frames existentes
+            for frame, edit_frame in self.node_frames:
+                frame.destroy()
+                if edit_frame:
+                    edit_frame.destroy()
+            self.node_frames.clear()
+            # Volver a crearlos
+            for idx, node in enumerate(self.graph.nodes, 1):
+                self.create_node_frame(node, idx)
+            self.draw_graph()
+            self.nodes_canvas.grid()
+            self.nodes_scrollbar.grid()
+            self.update_scroll_region()
+            
     # ==============================================================================================
     # LEFT PANEL
     # ==============================================================================================

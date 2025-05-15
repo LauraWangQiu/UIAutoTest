@@ -113,14 +113,22 @@ class GenerateGraph:
             return
         image_menu = os.path.join(state_path, images[0])
         print("[DFS] Imagen principal seleccionada: " + str(image_menu))
-
-        node = self.graph.get_node(image_menu)
-        print("[DFS] Nodo obtenido: " + str(node))
+        split_str = os.sep + "imgs" + os.sep if os.sep == "\\" else "/imgs/"
+        idx = image_menu.lower().find("imgs" + os.sep)
+        if idx == -1:  # Por si acaso separador no coincide, prueba también con /
+            idx = image_menu.lower().find("imgs/")
+        if idx != -1:
+            ruta_desde_imgs = image_menu[idx:]
+        else:
+            ruta_desde_imgs = image_menu  # Por si no está "imgs", lo devuelve completo
+        node = self.graph.get_node(images[0])
+        print("[DFS] Nodo obtenido: " + str(images[0]))
         if node is None:
+            nombre_sin_extension = os.path.splitext(images[0])[0]
             print("[DFS] Nodo no existe, se va a crear con imagen: " + str(image_menu))
-            self.graph.add_node_with_image(name=image_menu, image_path=image_menu)
-            node = self.graph.get_node(image_menu)
-            print("[DFS] Nodo creado: " + str(node))
+            self.graph.add_node_with_image(nombre_sin_extension, ruta_desde_imgs)
+            node = self.graph.get_node(nombre_sin_extension)
+            print("[DFS] Nodo creado: " + str(nombre_sin_extension) + " con imagen: " + str(ruta_desde_imgs))
 
         # Carpeta de botones (transiciones)
         buttons_click_path = os.path.join(state_path, "buttons", "click")
