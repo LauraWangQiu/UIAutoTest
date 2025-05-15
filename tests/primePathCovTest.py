@@ -78,7 +78,7 @@ class PrimePathCovTest(Test):
                 file.write("Prime Path Coverage Test:\n")
                 for path in self.prime_paths:
                     file.write("[")
-                    file.write(", ".join(path))
+                    file.write(", ".join(node.name for node in path))
                     file.write("]\n")
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))

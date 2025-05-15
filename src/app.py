@@ -12,8 +12,8 @@ from tkinter import messagebox
 from pathlib import Path
 from src.generateGraph import GenerateGraph
 from src.test import Test
-from src.graphsDef import Graph
-from src.graphsDef import Transition
+from src.graphsDef import Graph, Transition
+from src.testExecution import TestExecution
 import src.GraphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
 class App(ctk.CTk):  
@@ -31,6 +31,7 @@ class App(ctk.CTk):
         self.headless = headless  # Store the headless mode flag
         self.selected_executable = None
         self.graph = Graph()  # Graph provided by the user
+        self.test_execution = TestExecution()
         self.tests_dir = tests_directory
 
         if self.headless:
@@ -753,11 +754,8 @@ class App(ctk.CTk):
         generate_graph.generate_graph()
         graph = generate_graph.get_graph()
 
-        # At this point, the graph is generated and can be passed to the tests
-        for test_class_ref in selected_tests:
-            test_instance = test_class_ref(graph)
-            test_instance.run()
-            # TODO: Do something with the tests results
+        self.test_execution.add_tests_to_Execute(selected_tests)
+        self.test_execution.compare_graphs(self.graph )
 
     """
         Compare the generated graph with specified graph
