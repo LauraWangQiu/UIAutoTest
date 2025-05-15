@@ -16,8 +16,8 @@ class Node:
         self.transitions = []
 
     def set_image(self, image_path):
-        if path(image_path).exists():
-            self.image = path(image_path)
+        if path.exists(image_path):
+            self.image = image_path
             print("[INFO] Image set to '" + image_path + "' for node " + self.name + " .")
         else:
             print("[ERROR] Image path '" + image_path + "' does not exist.")
@@ -43,6 +43,11 @@ class Node:
     def update_name(self, new_name):
         print("[INFO] Changing node name from '" + self.name + "' to '" + new_name + "'.")
         self.name = new_name
+    """
+        Returns the image of the node
+    """
+    def get_transitions(self):
+        return self.transitions
 
 """
     Class Transition contains a condition to go to destination node
@@ -192,3 +197,13 @@ class Graph:
         self.nodes.clear()
         self.startNode = None
         print("[INFO] Graph cleared.")
+    
+    """
+        Check if a node is in the graph.
+    """
+    def is_node_in_graph(self, name):
+        for node in self.nodes:
+            if node.name == name:
+                print("[INFO] Node '" + node.name + "' is in the graph.")
+                return True
+        return False
