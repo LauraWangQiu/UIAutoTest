@@ -45,14 +45,26 @@ class TotalConnectTest(Test):
         try:
             with open(graph_file, "w") as file:
                 file.write("Total Connectivity Test:\n")
-                if len(self.visited_nodes) == len(self.graph):
+                # Nodes.
+                if len(self.visited_nodes) == len(self.graph.nodes):
                     file.write("--There are no non-visited nodes.")
                     pass
                 else:
                     file.write("--Non-visited nodes: \n")
-                    for node in self.visited_nodes:
-                        if node not in self.graph.nodes:
+                    for node in self.graph.nodes:
+                        if node not in self.visited_nodes:
                             file.write(node.name + "\n")
+                # Transitions.
+                file.write("--Non-visited transitions: \n")
+                aux: 0
+                for node in self.graph.nodes:
+                    for transition in node:
+                        if transition not in self.visited_transitions:
+                            aux += 1
+                            file.write("Transition: " + node.name + "-" + transition.destination)
+                if aux == 0:
+                    file.write("--There are no non-visited transitions.")
+
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
