@@ -164,6 +164,16 @@ class Graph:
         return t
 
     """
+        Returns the node with the given name.
+       """
+    def get_node(self, name):
+        for node in self.nodes:
+            if node.name == name:
+                return node
+        print("[ERROR] Node not found: " + name)
+        return None
+
+    """
         Sets the start node of the graph.
     """
     def set_start_node(self, node):
@@ -202,8 +212,10 @@ class Graph:
         Check if a node is in the graph.
     """
     def is_node_in_graph(self, name):
+        print("[INFO] Graph nodes: ", self.nodes)
         for node in self.nodes:
             if node.name == name:
-                print("[INFO] Node '" + node.name + "' is in the graph.")
+                #print("[INFO] Node '" + node.name + "' is in the graph.")
                 return True
+        #print("[ERROR] Node '" + name + "' is not in the graph.")
         return False
