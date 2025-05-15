@@ -8,10 +8,11 @@
 #   • NAME: unique identifier (no spaces)
 #   • IMAGE_PATH: relative path to the vertex’s PNG file 
 
-v A A_menu\A_menu.png
-v B B_menu\B_menu.png
-v C C_menu\C_menu.png
-v D D_menu\D_menu.png
+v A_menu A_menu\A_menu.png
+v B_menu B_menu\B_menu.png
+v C_menu C_menu\C_menu.png
+v D_menu D_menu\D_menu.png
+v E_menu E_menu\E_menu.png
 
 # Directed edges section
 # Each edge is declared as:
@@ -19,7 +20,9 @@ v D D_menu\D_menu.png
 #    • ACTION_NAME: action that should be done (CLICK, CLICK_AND_TYPE, DRAG_AND_DROP)
 #    • IMAGE_PATH: image path of the button. Relative path to the vertex’s PNG file
 
-e CLICK A B a2b.png
-e CLICK B C b2c.png
-e CLICK B D b2d.png
-e CLICK D A d2a.png
+e CLICK A_menu B_menu A_menu\buttons\click\a2b.png
+e CLICK B_menu C_menu B_menu\buttons\click\b2c.png
+e CLICK B_menu D_menu B_menu\buttons\click\b2d.png
+e CLICK D_menu A_menu D_menu\buttons\click\d2a.png
+e CLICK D_menu E_menu D_menu\buttons\click\d2e.png
+e CLICK E_menu C_menu E_menu\buttons\click\e2c.png

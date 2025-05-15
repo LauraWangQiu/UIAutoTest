@@ -50,7 +50,7 @@ class GraphIO:
                     parts = line.split()
                     if parts[0] == 'v' and len(parts) == 3:
                         name = parts[1]
-                        raw_path = parts[2].strip('"')
+                        raw_path = parts[2]
                         node = self.graph.add_node(name)
                         if node:
                             node.set_image(os.path.join(img_dir, raw_path))
@@ -76,7 +76,7 @@ class GraphIO:
                             if len(parts) != 5:
                                 print("[ERROR] Invalid number of args for " + action_str + ", expected 5 but got " + str(len(parts)))
                                 continue
-                            img = parts[4].strip('"')
+                            img = parts[4]
                             if action == ActionType.CLICK:
                                 self.handle_click_action(src_node, tgt_node, os.path.join(img_dir, img))
                             else:
@@ -86,16 +86,16 @@ class GraphIO:
                             if len(parts) != 6:
                                 print("[ERROR] Invalid number of args for CLICK_AND_TYPE, expected 6 but got " + str(len(parts)))
                                 continue
-                            img = parts[4].strip('"')
-                            text = parts[5].strip('"')
+                            img = parts[4]
+                            text = parts[5]
                             self.handle_click_and_type_action(src_node, tgt_node, text, os.path.join(img_dir, img))
 
                         elif action == ActionType.DRAG_AND_DROP:
                             if len(parts) != 7:
                                 print("[ERROR] Invalid number of args for DRAG_AND_DROP, expected 7 but got " + str(len(parts)))
                                 continue
-                            drag_img = parts[4].strip('"')
-                            drop_img = parts[5].strip('"')
+                            drag_img = parts[4]
+                            drop_img = parts[5]
                             self.handle_drag_and_drop_action(src_node, tgt_node, os.path.join(img_dir, drag_img), os.path.join(img_dir, drop_img))
 
                         else:
@@ -153,9 +153,9 @@ class GraphIO:
         try:
             with open(graph_file, "w") as f:
                 edge_lines = []
-                # Recorres nodos y escribes solo los vértices, pero acumulas edges
+                # Iterate nodes and write only the vertices, but accumulate edges
                 for node in graph.nodes:
-                    image_name = os.path.basename(node.image) if node.image else "None"
+                    image_name = node.image.split("imgs\\", 1)[1]
                     f.write("v " + node.name + " " + image_name + "\n")
 
                     for trans in node.transitions:
@@ -163,21 +163,21 @@ class GraphIO:
                         dst = trans.destination.name
 
                         if act in ("CLICK", "DOUBLE_CLICK"):
-                            image_name = os.path.basename(trans.image) if trans.image else "None"
+                            image_name = trans.image.split("imgs\\", 1)[1]
                             edge_lines.append("e " + act + " " + node.name + " " + dst + " " + image_name + "\n")
 
                         elif act == "CLICK_AND_TYPE":
-                            image_name = os.path.basename(trans.image) if trans.image else "None"
+                            image_name = trans.image.split("imgs\\", 1)[1]
                             edge_lines.append("e " + act + " " + node.name + " " + dst + " " + image_name + " " + trans.text + "\n")
 
                         elif act == "DRAG_AND_DROP":
-                            drag_image_name = os.path.basename(trans.drag_image) if trans.drag_image else "None"
-                            drop_image_name = os.path.basename(trans.drop_image) if trans.drop_image else "None"
+                            drag_image_name = trans.drag_image.split("imgs\\", 1)[1]
+                            drop_image_name = trans.drop_image.split("imgs\\", 1)[1]
                             edge_lines.append("e " + act + " " + node.name + " " + dst + " " + drag_image_name + " " + drop_image_name + "\n")
 
                         else:
                             edge_lines.append("e " + act + " " + node.name + " " + dst + "\n")
-                # Escribes todas las aristas al final
+                # Write all edges at the end
                 f.writelines(edge_lines)
         except Exception as e:
             print("[ERROR] Exception while writing the graph: " + str(e))

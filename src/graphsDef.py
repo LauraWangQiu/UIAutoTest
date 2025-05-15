@@ -130,7 +130,6 @@ class Graph:
                 print("[INFO] Node with name '" + name + "' already exists.")
                 return None  
         n = Node(name)
-        print("NODEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE '" + name )
         self.nodes.append(n)
         return n
     
@@ -173,7 +172,7 @@ class Graph:
     def add_transition(self, origin, destination, condition=None):
         """
         Adds a transition to the graph.
-        Returns the new Transition, or None if origin/destination no están en el grafo.
+        Returns the new Transition, or None if origin/destination are not in the graph.
         """
         if origin not in self.nodes or destination not in self.nodes:
             if origin not in self.nodes:
@@ -189,16 +188,17 @@ class Graph:
 
     """
         Returns the node with the given name.
-       """
+    """
     def get_node(self, name):
         for node in self.nodes:
             if node.name == name:
                 return node
         print("[ERROR] Node not found: " + name)
         return None
+
     """
         Returns the node with the given image.
-       """
+    """
     def get_node_image(self, image):
         for node in self.nodes:
             if node.image == image:
