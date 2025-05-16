@@ -261,16 +261,12 @@ class GenerateGraph:
     def _restart_executable_and_continue(self):
         self._stop_executable()
         
-        if (self.lastInput is None or self.inputs[self.lastInput] is None or len(self.inputs[self.lastInput]) == 0):
+        if self.lastInput is None  or not self.inputs.get(self.lastInput):
             print("[INFO] AAAAAAA.")
             return
-        print("Begin " + str(self.inputs[self.lastInput]))
+        
         self.inputs[self.lastInput].pop()
-        print("Began/Begun " + str(self.inputs[self.lastInput]))
-       
-        if (self.inputs[self.lastInput] is None or len(self.inputs[self.lastInput]) == 0):
-            print("[INFO] BBBBBBB.")
-            return
+        
         self._ensure_executable_running()
         self.navigate_to_state(self.inputs[self.lastInput])
         
