@@ -533,7 +533,10 @@ class App(ctk.CTk):
 
         transition.input_type_frame = input_type_frame
 
-        input_types = ["NONE"] + [ActionType.CLICK, ActionType.DOUBLE_CLICK, ActionType.CLICK_AND_TYPE, ActionType.DRAG_AND_DROP]
+        input_types = [
+            value for name, value in vars(ActionType).items()
+            if not name.startswith("__") and not callable(value)
+        ]
 
         input_type_menu = ctk.CTkOptionMenu(
             input_type_frame,

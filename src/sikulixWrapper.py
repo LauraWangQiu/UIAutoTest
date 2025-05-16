@@ -58,7 +58,6 @@ class SikulixWrapper:
 
         return False
     
-    
     def search_image_once(self, image_path, similarity=1.0, timeout=2):
         """
         Search for an image on the screen once.
@@ -77,8 +76,6 @@ class SikulixWrapper:
             print("[WARNING] Not found.")
             return False
 
-
-    
     """
         Attempt to locate and click the given image on screen.
 
