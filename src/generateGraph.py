@@ -98,144 +98,126 @@ class GenerateGraph:
             print("[LOOP] No states found.")
             return
         self._ensure_executable_running()
-        # Selects the first state folder
-        self._dfs_state(state_folders[0])
+        self.graph.set_start_node(self._dfs_state())
         print("[LOOP] DFS graph loop finished.")
         self._stop_executable()
         self._stop_loop.set()
 
-    def _dfs_state(self, state_path):
-        if state_path in self.visited_states:
-            print("[DFS] State already visited: " + str(state_path))
-            self._restart_executable_and_continue()
-            return
-        
-        print("[DFS] Visiting state: " + str(state_path))
-        self.visited_states.add(state_path)
+    def _dfs_state(self):
+        initial_similarity = 0.99
+        min_similarity = 0.85
+        similarity_step = 0.01
+        timeout = 2
 
-        # Search for the main image of the state (only one, the first found)
-        images = [f for f in os.listdir(state_path)
-                if os.path.isfile(os.path.join(state_path, f)) and os.path.splitext(f)[1].lower() in self.valid_extensions]
-        print("[DFS] Images found in the state: " + str(images))
+        current_state = None        # Node object
+        current_state_path = None   # Path to the image of the current state
+        current_state_name = None   # Name of the current state
 
-        if not images:
-            print("[DFS] No main image in " + str(state_path))
-            return
-        
-        # There must be at least one image and the first one is the main image
-        image_menu = os.path.join(state_path, images[0])
-        node_name = os.path.splitext(images[0])[0]
-        node = self.graph.get_node(node_name)
-        print("[DFS] Main image selected: " + str(image_menu))
-        print("[DFS] Node name: " + str(node_name))
-        print("[DFS] Node: " + str(node))
+        # Check if current state exists
+        similarity = initial_similarity
+        while similarity >= min_similarity and current_state is None:
+            print("[DFS] Searching for current state with similarity: " + str(similarity))
+            for candidate_state in os.listdir(self.full_images_dir):
+                candidate_path = os.path.join(self.full_images_dir, candidate_state)
+                # It must be a directory
+                if not os.path.isdir(candidate_path):
+                    continue
 
-        if node is None:
-            print("[DFS] Node does not exist, it will be created with image: " + str(image_menu))
-            self.graph.add_node_with_image(node_name, image_menu)
-            node = self.graph.get_node(node_name)
-            print("[DFS] Node created: " + str(node_name) + " with image: " + str(image_menu))
-    
-        # Buttons folder (transitions)
-        buttons_path = os.path.join(state_path, self.buttons_dir)
-        buttons_input_path = None
-        for name, action_type in vars(ActionType).items():
-            if isinstance(action_type, str) and name.isupper():
-                print("[DFS] Checking action type: " + str(action_type))
-                action_type_path = action_type.lower()
-                
-                buttons_input_path = os.path.join(buttons_path, action_type_path)
-                print("[DFS] " + action_type_path +" buttons path: " + str(buttons_input_path))
-
-                if not os.path.isdir(buttons_input_path):
-                    print("[DFS] No " + action_type_path + " buttons folder in " + str(buttons_input_path))
+                candidate_states = [f for f in os.listdir(candidate_path)
+                                    if os.path.isfile(os.path.join(candidate_path, f)) and os.path.splitext(f)[1].lower() in self.valid_extensions]
+                if not candidate_states:
                     continue
                 
-                print("[DFS] " + action_type_path + " buttons folder found: " + str(buttons_input_path))
-                break
+                # There must be at least one image and the first one selected is the main state image
+                candidate_state_path = os.path.join(candidate_path, candidate_states[0])
+                print("[DFS] Checking if the screen matches: " + str(candidate_state_path))
+                if self.sikuli.search_image_once(candidate_state_path, similarity=similarity, timeout=timeout):
+                    # Create node in graph
+                    current_state_path = candidate_path
+                    current_state_name = candidate_state
+                    current_state = self.graph.add_node_with_image(current_state_name, candidate_state_path)
+                    print("[DFS] The screen matches with state: " + str(current_state_name))
+                    break
                     
-        if buttons_input_path is None or not os.path.isdir(buttons_input_path):
-            print("[DFS] No buttons folder found in " + str(state_path))
-            self._restart_executable_and_continue(pop=False)
-            return
-        
-        # For each transition button
-        buttons = [f for f in os.listdir(buttons_input_path) if os.path.isfile(os.path.join(buttons_input_path, f))]
-        if not buttons:
-            print("[DFS] No buttons found in " + str(buttons_input_path))
-            return
-        
-        print("[DFS] Buttons images found: " + str(buttons))
-        for idx, btn in enumerate(buttons):
-            btn_path = os.path.join(buttons_input_path, btn)
-            print("[DFS] Simulating " + action_type + " on: " + str(btn_path))
-            result = self.do_action(action_type, btn_path)
-            if not result:
-                print("[DFS] Could not " + self.lastInput + " on: " + str(btn_path))
-                continue
+            similarity -= similarity_step
 
-            self.add_inputs_to_path(btn_path)
+        if current_state is not None:
+            found = False
+            if current_state not in self.visited_states:
+                print("[DFS] Visiting state: " + str(current_state))
+                self.visited_states.add(current_state)
 
-            dest_state_path = None
-            initial_similarity = 0.99
-            min_similarity = 0.85
-            similarity_step = 0.01
-            similarity = initial_similarity
-            timeout = 2
+                # If there are no action types, return the current state (first found state)
+                if not any(isinstance(value, str) and name.isupper() for name, value in vars(ActionType).items()):
+                    print("[DFS] No action types found.")
+                    return current_state
 
-            # Checks the screen for the next state
-            while similarity >= min_similarity and dest_state_path is None:
-                print("[DFS] Searching for destination state with similarity: " + str(similarity))
-                for candidate_state in os.listdir(self.full_images_dir):
-                    candidate_path = os.path.join(self.full_images_dir, candidate_state)
-                    # It must be a directory
-                    if not os.path.isdir(candidate_path):
-                        continue
+                # Check if buttons folder exists
+                buttons_path = os.path.join(current_state_path, self.buttons_dir)
+                if not os.path.isdir(buttons_path):
+                    print("[DFS] No buttons folder found in " + str(current_state_path))
+                    return current_state
 
-                    candidate_states = [f for f in os.listdir(candidate_path)
-                                        if os.path.isfile(os.path.join(candidate_path, f)) and os.path.splitext(f)[1].lower() in self.valid_extensions]
-                    if not candidate_states:
-                        continue
-                    
-                    # There must be at least one image and the first one selected is the main state image
-                    candidate_state_path = os.path.join(candidate_path, candidate_states[0])
-                    print("[DFS] Checking if the screen matches: " + str(candidate_state_path))
-                    if self.sikuli.search_image_once(candidate_state_path, timeout=timeout, similarity=similarity):
-                        dest_state_path = candidate_path
-                        print("[DFS] The screen matches with state: " + str(dest_state_path))
-                        break
+                buttons_input_path = None
+                for name, action_type in vars(ActionType).items():
+                    if isinstance(action_type, str) and name.isupper():
+                        print("[DFS] Checking action type: " + str(action_type))
+                        action_type_path = action_type.lower()
+                        aux_path = os.path.join(buttons_path, action_type_path)
+                        if not os.path.isdir(aux_path):
+                            print("[DFS] No " + action_type_path + " buttons folder in " + str(buttons_input_path))
+                            continue
                         
-                similarity -= similarity_step
+                        buttons_input_path = aux_path
+                        print("[DFS] " + action_type_path + " buttons folder found: " + str(buttons_input_path))
+                        
+                        # Check if there are button images in the folder
+                        buttons_input_path_names = [f for f in os.listdir(buttons_input_path) if os.path.isfile(os.path.join(buttons_input_path, f))]
+                        if not buttons_input_path_names:
+                            print("[DFS] No buttons found in " + str(buttons_input_path))
+                            continue
+                        
+                        print("[DFS] Buttons images found: " + str(buttons_input_path))
+                        for idx, btn in enumerate(buttons_input_path_names):
+                            btn_path = os.path.join(buttons_input_path, btn)
+                            print("[DFS] Simulating " + action_type + " with button image: " + str(btn_path))
+                            self.lastInput = action_type
+                            result = self.do_action(action_type, btn_path)
+                            if not result:
+                                print("[DFS] Could not " + self.lastInput + " on: " + str(btn_path))
+                                continue
+                            
+                            found = True
+                            time.sleep(self.delay)
+                            self.add_inputs_to_path(btn_path)
+                            dst_node = self._dfs_state()
+                            print("[DFS] Creating transition from node: " + str(current_state_name) + " with image: " + str(btn_path))
+                            transition = self.graph.add_transition(current_state, dst_node)
+                            transition.update_action(action_type)
+                            transition.update_image(btn_path)
 
-            if dest_state_path is not None:
-                print("[DFS] Creating transition from node: " + str(node_name) + " with image: " + str(btn_path))
-                dst_node_name = os.path.splitext(os.path.basename(dest_state_path))[0]
-                print("[DFS] Destination node name: " + str(dst_node_name))
-                dst_node = self.graph.add_node_with_image(dst_node_name, candidate_state_path)
-                transition = self.graph.add_transition(node, dst_node)
-                transition.update_action(self.lastInput)
-                transition.update_image(btn_path)
-                print("[DFS] Transition added. Recursively calling _dfs_state with destination: " + str(dest_state_path))
-                self._dfs_state(dest_state_path)
-            else:
-                print("[DFS] Destination state not found for button " + str(btn))
-                phantom_node_name = self.default_state_name + str(self.phantom_state_counter)
-                phantom_dir = os.path.join(self.full_images_dir, phantom_node_name)
-                if not os.path.exists(phantom_dir):
-                    os.makedirs(phantom_dir)
+            if not found:
+                self._restart_executable_and_continue()
 
-                # Screenshot and save
-                file_path = self.sikuli.capture_error(phantom_node_name, phantom_dir)
-                print("[DFS] Screenshot saved at: " + phantom_dir)
+        else:
+            print("[DFS] Current state not found")
+            phantom_node_name = self.default_state_name + str(self.phantom_state_counter)
+            phantom_dir = os.path.join(self.full_images_dir, phantom_node_name)
+            if not os.path.exists(phantom_dir):
+                os.makedirs(phantom_dir)
 
-                # Add the phantom node to the graph
-                self.graph.add_node_with_image(phantom_node_name, file_path)
-                print("[DFS] Phantom node created: " + phantom_node_name + " with image: " + file_path)
+            # Screenshot and save
+            file_path = self.sikuli.capture_error(phantom_node_name, phantom_dir)
+            print("[DFS] Screenshot saved at: " + phantom_dir)
 
-                # Increment the counter
-                self.phantom_state_counter += 1
-                # ---------- END PHANTOM BLOCK -----------
-                self._restart_executable_and_continue(pop=False)
+            # Add the phantom node to the graph
+            current_state = self.graph.add_node_with_image(phantom_node_name, file_path)
+            print("[DFS] Phantom node created: " + phantom_node_name + " with image: " + file_path)
+
+            # Increment the counter
+            self.phantom_state_counter += 1
+        
+        return current_state
 
     def do_action(self, action_type, btn_path, text=None, btn2_path=None, similarity=1.0, timeout=0.01, retries=6, similarity_reduction=0.1, clear_before=False):
         if action_type is None or not ActionType.is_valid_action(action_type):
@@ -263,15 +245,20 @@ class GenerateGraph:
             print("[INFO] Dragging and dropping from: " + str(btn_path) + " to: " + str(btn2_path))
             result = self.sikuli.drag_and_drop(btn_path, btn2_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction)
 
-        self.lastInput = action_type
         return result
 
-    def _restart_executable_and_continue(self, pop=True):
+    def _restart_executable_and_continue(self):
         self._stop_executable()
+        if (self.lastInput is None or self.inputs[self.lastInput] is None or len(self.inputs[self.lastInput]) == 0):
+            print("[INFO] AAAAAAA.")
+            return
+        self.inputs[self.lastInput].pop()
+        if (self.inputs[self.lastInput] is None or len(self.inputs[self.lastInput]) == 0):
+            print("[INFO] BBBBBBB.")
+            return
         self._ensure_executable_running()
-        if pop:
-            self.inputs[self.lastInput].pop()
         self.navigate_to_state(self.inputs[self.lastInput])
+        self.lastInput = None
 
     def add_inputs_to_path(self, btn_path):
         self.inputs[self.lastInput].append(btn_path)
