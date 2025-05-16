@@ -34,36 +34,39 @@ class App(ctk.CTk):
                 images_dir, tests_dir, 
                 theorical_graph_file,
                 practical_graph_file,
+                generate_graph,
                 selected_executable,
                 executable_delay,
                 tests_to_run,
                 test_solution_file,
                 headless=False):
-        self.java_path = java_path                          # Path to Java executable
-        self.jython_jar = jython_jar                        # Path to Jython jar file
-        self.sikulix_jar = sikulix_jar                      # Path to SikuliX jar file
-        self.sikuli_script = sikuli_script                  # Path to Sikuli script
-        self.jython_process = None                          # Jython process
-        self.jython_thread = None                           # Jython thread
-
-        self.graph_io = GraphIO()                           # GraphIO instance
-        self.graph = Graph()                                # Theorical graph
-        self.graph_exe = Graph()                            # Practical graph
-        self.theorical_graph_file   = theorical_graph_file  # Theoretical graph file
-        self.practical_graph_file   = practical_graph_file  # Practical graph file
-        self.images_dir             = images_dir            # Directory of images
-        self.tests_dir              = tests_dir             # Directory of tests
-        self.test_classes = self.get_test_classes()
-        self.selected_executable    = selected_executable   # Selected executable path
-        self.executable_delay       = executable_delay      # Delay for the executable to start
-        self.tests_to_run           = tests_to_run          # List of tests to run
-        self.test_solution_file     = test_solution_file    # Test solution file
-        self.headless               = headless              # Store the headless mode flag
+        self.java_path = java_path                                      # Path to Java executable
+        self.jython_jar = jython_jar                                    # Path to Jython jar file
+        self.sikulix_jar = sikulix_jar                                  # Path to SikuliX jar file
+        self.sikuli_script = sikuli_script                              # Path to Sikuli script
+        self.jython_process = None                                      # Jython process
+        self.jython_thread = None                                       # Jython thread
+            
+        self.graph_io = GraphIO()                                       # GraphIO instance
+        self.graph = Graph()                                            # Theorical graph
+        self.graph_exe = Graph()                                        # Practical graph
+        self.theorical_graph_file   = theorical_graph_file              # Theoretical graph file
+        self.practical_graph_file   = practical_graph_file              # Practical graph file
+        self.generate_graph         = generate_graph                    # Flag to generate graph
+        self.images_dir             = images_dir                        # Directory of images
+        self.tests_dir              = tests_dir                         # Directory of tests
+        self.test_classes = self.get_test_classes()         
+        self.selected_executable    = selected_executable               # Selected executable path
+        self.executable_delay       = executable_delay                  # Delay for the executable to start
+        self.tests_to_run           = tests_to_run                      # List of tests to run
+        self.test_solution_file     = test_solution_file                # Test solution file
+        self.headless               = headless                          # Store the headless mode flag
 
         if self.headless:
             print("[INFO] Application initialized in headless mode")
             self.load_graph_from_file(self.theorical_graph_file)
-            self.generate_graph_from_executable()
+            if self.generate_graph:
+                self.generate_graph_from_executable()
             self.run_tests()
         else: 
             super().__init__()
@@ -1038,7 +1041,10 @@ class App(ctk.CTk):
             print("[INFO] No tests selected")
             return
         
-        self.check_jython_thread(selected_test_classes)
+        if self.generate_graph:
+            self.check_jython_thread(selected_test_classes)
+        else:
+            self.execute_selected_tests(selected_test_classes)
 
     """
         Run the Jython script to generate the graph
