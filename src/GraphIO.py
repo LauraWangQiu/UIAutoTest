@@ -107,7 +107,8 @@ class GraphIO:
             print("[ERROR] An error occurred while loading the graph: " + str(e))
 
         if self.graph.nodes:
-            self.graph.set_start_node(self.graph.nodes[0])
+            first_node = next(iter(self.graph.nodes))
+            self.graph.set_start_node(first_node)
 
         return self.graph
 
@@ -156,7 +157,11 @@ class GraphIO:
                 # Iterate nodes and write only the vertices, but accumulate edges
                 for node in graph.nodes:
                     node_name = node.name.replace(" ", "_")
-                    image_name = node.image.split(images_dir, 1)[1].lstrip("/\\")
+                    if node.image and images_dir in node.image:
+                        image_name = node.image.split(images_dir, 1)[1].lstrip("/\\")
+                    else:
+                        image_name = "unknown_image"
+                        print("[WARNING] Node " + node_name + " has no valid image path.")
                     f.write("v " + node_name + " " + image_name + "\n")
 
                     for trans in node.transitions:

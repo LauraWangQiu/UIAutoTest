@@ -1110,10 +1110,8 @@ class App(ctk.CTk):
         file_path = os.path.abspath(self.practical_graph_file)
         graph = self.graph_io.load_graph(file_path, self.images_dir)
         for test_class_ref in selected_test_classes:
-            test_instance = test_class_ref(graph)
+            test_instance = test_class_ref(graph, self.test_solution_file)
             test_instance.run()
-            # TODO: Do something with the tests results
-            test_instance.write_solution(self.test_solution_file)
         
         # Directly compare the generated graph with the expected graph
         if self.headless:

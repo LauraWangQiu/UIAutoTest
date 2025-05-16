@@ -1,11 +1,8 @@
 from test import Test
 
 class PrimePathCovTest(Test):
-    def __init__(self, graph = None, graph_file = "output_graph.txt"):
-        super().__init__("PPC Test", "output_graph.txt")
-        self.graph = graph
-        self.graph_f = graph_file 
-        # Variables and modifiable parameters:
+    def __init__(self, graph=None, graph_file=None):
+        super().__init__("PPC Test", graph, graph_file)
         self.prime_paths = set()
 
     """
@@ -13,20 +10,15 @@ class PrimePathCovTest(Test):
     """
     def run(self):
         print("Running " + self.name + ".")
-        # self.prime_paths.clear()
-        # # Do something with the generated graph:
-        # self.execute_test()
-        # self.write_solution(self.graph_f)
+        self.prime_paths.clear()
         
-    # Prime Path Coverage Test:
-    def execute_test(self):
         all_paths = []
 
         # Get all the paths
         for node in self.graph.nodes:
-            self.dfs(node, set(), [], all_paths)
+            self.dfs(node, set(), [], all_paths) # POR QUE?
         
-        # Filter and keep the prime paths only.
+        # Filter and keep the prime paths only
         for referencePath in all_paths:
             prime = True
 
@@ -36,8 +28,10 @@ class PrimePathCovTest(Test):
                         prime = False
                         break
             if prime:
-                self.prime_paths.add(referencePath)
+                self.prime_paths.add(tuple(referencePath))
 
+        self.write_solution()
+        
     # DFS method to get all the paths.
     def dfs(self, current, visited, path, all_paths):
         visited.add(current)
@@ -71,10 +65,9 @@ class PrimePathCovTest(Test):
     """
         Overrides the parent write_solution method
     """
-    # TODO: PAIGRO HERE.
-    def write_solution(self, graph_file):
+    def write_solution(self):
         try:
-            with open(graph_file, "w") as file:
+            with open(self.graph_file, "a") as file:
                 file.write("Prime Path Coverage Test:\n")
                 for path in self.prime_paths:
                     file.write("[")
@@ -83,4 +76,4 @@ class PrimePathCovTest(Test):
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
-            print("[INFO] Test data from: " + self.name + " successfully written to " + graph_file)
+            print("[INFO] Test data from: " + self.name + " successfully written to " + self.graph_file)

@@ -23,7 +23,6 @@ class Node:
             print("[ERROR] Image path '" + image_path + "' does not exist.")
 
     def add_transition(self, transition):
-        print("[INFO] Adding transition from '" + self.name + "' to '" + transition.destination.name + "'.")
         self.transitions.append(transition)
 
     """
@@ -79,24 +78,34 @@ class Transition:
         self.drag_image = None
         self.drop_image = None
    
+    """
+        Update the action type of this transition.
+    """
     def update_action(self, action):
-        """Update the action type of this transition."""
         self.action = action
 
+    """
+        Update the image for this transition.
+    """
     def update_image(self, image_path):
-        """Update the image for this transition."""
         self.image = image_path
 
+    """
+        Update the text for CLICK_AND_TYPE transitions.
+    """
     def update_text(self, text):
-        """Update the text for CLICK_AND_TYPE transitions."""
         self.text = text
     
+    """
+        Update the destination node
+    """
     def update_destination(self, node):
-        """Update the destination node"""
         self.destination = node
 
+    """
+    Update drag and drop images for this transition.
+    """
     def update_drag_and_drop(self, drag_image, drop_image):
-        """Update drag and drop images for this transition."""
         self.drag_image = drag_image
         self.drop_image = drop_image
 
@@ -109,7 +118,7 @@ class Transition:
 """
 class Graph:
     def __init__(self):
-        self.nodes = []
+        self.nodes = set()
         self.startNode = None
 
     """
@@ -117,12 +126,13 @@ class Graph:
         Returns new node
     """
     def add_node(self, name):
+        # Search for existing node with the same name
         for node in self.nodes:
             if node.name == name:
                 print("[INFO] Node with name '" + name + "' already exists.")
-                return None  
+                return node  
         n = Node(name)
-        self.nodes.append(n)
+        self.nodes.add(n)
         return n
     
     """
@@ -134,10 +144,10 @@ class Graph:
         for node in self.nodes:
             if node.name == name:
                 print("[INFO] Node with name '" + name + "' already exists.")
-                return None  
+                return node  
         n = Node(name)
         n.set_image(image_path)
-        self.nodes.append(n)
+        self.nodes.add(n)
         return n        
     
     """
@@ -164,9 +174,9 @@ class Graph:
     def add_transition(self, origin, destination):
         if origin not in self.nodes or destination not in self.nodes:
             if origin not in self.nodes:
-                print("[ERROR] Origin node '" + origin.name + "' is not in the graph.")
+                print("[ERROR] Origin node '" + origin + "' is not in the graph.")
             if destination not in self.nodes:
-                print("[ERROR] Destination node '" + destination.name + "' is not in the graph.")
+                print("[ERROR] Destination node '" + destination + "' is not in the graph.")
             return None
 
         t = Transition(destination)
