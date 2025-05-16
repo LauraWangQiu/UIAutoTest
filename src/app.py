@@ -1039,6 +1039,7 @@ class App(ctk.CTk):
 
         if not selected_test_classes:
             print("[INFO] No tests selected")
+            self.compare()
             return
         
         if self.generate_graph:
@@ -1112,13 +1113,19 @@ class App(ctk.CTk):
         Execute the selected tests
     """
     def execute_selected_tests(self, selected_test_classes):
+        # Erasing the test solution file.
+        open(self.test_solution_file, "w").close()
+        print("[INFO] Erasing test solution file...")
+
         file_path = os.path.abspath(self.practical_graph_file)
         graph = self.graph_io.load_graph(file_path, self.images_dir)
         for test_class_ref in selected_test_classes:
             test_instance = test_class_ref(graph, self.test_solution_file)
+            print(f"[INFO] Running test: {test_class_ref.__name__}")
             test_instance.run()
+            test_instance.write_solution()
         
-        # Directly compare the generated graph with the expected graph
+        # Directly compare the generated graph with the expected graph.
         if self.headless:
             self.compare()
 
@@ -1131,7 +1138,7 @@ class App(ctk.CTk):
         generated_graph = self.graph_io.load_graph(file_path, self.images_dir)
         print("Comparing results...")
         differences_found = 0
-        with open(self.test_solution_file, "w") as f:
+        with open(self.test_solution_file, "a") as f:
             print("[INFO] Comparing generated graph with given graph...")
             f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
             differences_found += self.compare_aux(generated_graph, self.graph, f)
