@@ -1,0 +1,24 @@
+[EDGE PAIR COVERAGE TEST]
+- From 'B_menu' to 'C_menu' has multiple transitions
+- From 'A_menu' to 'B_menu' has multiple transitions
+[EDGE PAIR COVERAGE TEST]
+- From 'B_menu' to 'C_menu' has multiple transitions
+- From 'A_menu' to 'B_menu' has multiple transitions
+[PRIME PATH COVERAGE TEST]
+[PRIME PATH] A_menu -> B_menu -> C_menu[PRIME PATH COVERAGE TEST]
+[PRIME PATH] A_menu -> B_menu -> C_menu[SELF LOOP TEST]
+[SELF LOOP NODE ]A_menu
+[SELF LOOP NODE ]B_menu
+[SELF LOOP NODE ]C_menu
+[SELF LOOP TEST]
+[SELF LOOP NODE ]A_menu
+[SELF LOOP NODE ]B_menu
+[SELF LOOP NODE ]C_menu
+[TOTAL CONNECTIVITY TEST]
+[NON-VISITED NODES] 
+There are not non-visited nodes
+[NON-VISITED TRANSITIONS]
+[TOTAL CONNECTIVITY TEST]
+[NON-VISITED NODES] 
+There are not non-visited nodes
+[NON-VISITED TRANSITIONS]

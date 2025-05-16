@@ -4,12 +4,15 @@ class EdgePairCovTest(Test):
     def __init__(self, graph=None, graph_file=None):
         super().__init__("EPC Test", graph, graph_file)
         self.EdgePairCovList = set()   # Dictionary of duplicated edges
+        self._update_callback = None
+
     
     """
         Overrides the parent run method
     """
     def run(self):
         print("Running " + self.name + ".")
+        self.EdgePairCovList.clear()
         for node in self.graph.nodes:
             edge_count = {}
             for transitions in node.transitions:
@@ -21,14 +24,17 @@ class EdgePairCovTest(Test):
                     if (node.name, dest_name) not in self.EdgePairCovList:
                         self.EdgePairCovList.add((node.name, dest_name))
                         print(f"Multiple transitions ({count}) from '{node.name}' to '{dest_name}'")
-
-        if not self.EdgePairCovList:
-            print ("List is empty")
-        else:
-            for origin, dest in self.EdgePairCovList:
-                print(F"- From '{origin}' to '{dest}' has multiple transitions\n")
                 
+        content = "\n".join(f"From '{origin}' to '{dest}'" for origin, dest in self.EdgePairCovList)
+        self.notify_update("EdgePairCovList", content)
         self.write_solution()
+
+    def set_update_callback(self, callback):
+        self._update_callback = callback
+
+    def notify_update(self, attr_name, content):
+        if self._update_callback:
+            self._update_callback(attr_name, content)
 
     def write_solution(self):
         try:

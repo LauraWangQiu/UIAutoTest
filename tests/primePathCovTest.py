@@ -4,6 +4,8 @@ class PrimePathCovTest(Test):
     def __init__(self, graph=None, graph_file=None):
         super().__init__("PPC Test", graph, graph_file)
         self.prime_paths = set()
+        self._update_callback = None
+
 
     """
         Overrides the parent run method
@@ -30,7 +32,17 @@ class PrimePathCovTest(Test):
             if prime:
                 self.prime_paths.add(tuple(referencePath))
 
+        
+        content = "".join(" → ".join(node.name for node in path) for path in self.prime_paths)
+        self.notify_update("prime_paths", content)
         self.write_solution()
+    
+    def set_update_callback(self, callback):
+        self._update_callback = callback
+
+    def notify_update(self, attr_name, content):
+        if self._update_callback:
+            self._update_callback(attr_name, content)
         
     # DFS method to get all the paths.
     def dfs(self, current, visited, path, all_paths):

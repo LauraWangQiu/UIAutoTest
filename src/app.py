@@ -62,6 +62,9 @@ class App(ctk.CTk):
         self.test_solution_file     = test_solution_file                # Test solution file
         self.headless               = headless                          # Store the headless mode flag
 
+        self.test_output_widgets = {}
+        self.test_instances = {}
+
         if self.headless:
             print("[INFO] Application initialized in headless mode")
             self.load_graph_from_file(self.theorical_graph_file)
@@ -883,6 +886,7 @@ class App(ctk.CTk):
     """
     def add_test_tab(self, test_class_name, test_class_ref):
         test_instance = test_class_ref()
+        self.test_instances[test_class_name] = test_instance
         tab_name = getattr(test_instance, "name", test_class_name)
 
         new_tab = ctk.CTkFrame(self.tab_control)
@@ -893,6 +897,11 @@ class App(ctk.CTk):
 
         attributes_frame = ctk.CTkFrame(new_tab)
         attributes_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.test_output_widgets[test_class_name] = {}
+
+         # Pasamos el callback para que el test nos notifique
+        test_instance.set_update_callback(lambda attr_name, content: self.update_test_output(test_class_name, attr_name, content))
 
         # Show the attributes of the test class
         for attr_name, attr_value in vars(test_instance).items():
@@ -908,8 +917,21 @@ class App(ctk.CTk):
                 attr_listbox.insert("1.0", "\n".join(map(str, attr_value)))
                 attr_listbox.configure(state="disabled")
                 attr_listbox.pack(fill="x", padx=5, pady=2)
+
+                self.test_output_widgets[test_class_name][attr_name] = attr_listbox
             # TODO: Add the needed arguments to run the test
             # elif isinstance(attr_value, list):
+
+    
+    def update_test_output(self, test_class_name, attr_name, values):
+        try:
+            textbox = self.test_output_widgets[test_class_name][attr_name]
+            textbox.configure(state="normal")
+            textbox.delete("1.0", "end")
+            textbox.insert("1.0", "".join(map(str, values)))
+            textbox.configure(state="disabled")
+        except KeyError:
+            print(f"[ERROR] No textbox found for {test_class_name}.{attr_name}")
 
     # ==============================================================================================
     # TESTS RUNNER & COMPARISON TAB
@@ -1028,6 +1050,8 @@ class App(ctk.CTk):
         # else, run tests from the GUI
         selected_test_classes = []
 
+        print("Hola...")
+
         if self.headless:
             available_test_classes = {name: ref for name, ref in self.test_classes}
             for test_name in self.tests_to_run:
@@ -1036,19 +1060,19 @@ class App(ctk.CTk):
                 else:
                     print(f"[ERROR] Test class '{test_name}' not found in available test classes.")
         else:
-            selected_test_classes = [
-                test_class_ref for test_class_name, (var, test_class_ref) in self.test_checkboxes.items() if var.get()
+            selected_test_class_names = [
+                test_class_name for test_class_name, (var, _) in self.test_checkboxes.items() if var.get()
             ]
 
-        if not selected_test_classes:
+        if not selected_test_class_names:
             print("[INFO] No tests selected")
             self.compare()
             return
         
         if self.generate_graph:
-            self.check_jython_thread(selected_test_classes)
+            self.check_jython_thread(selected_test_class_names)
         else:
-            self.execute_selected_tests(selected_test_classes)
+            self.execute_selected_tests(selected_test_class_names)
 
     """
         Run the Jython script to generate the graph
@@ -1122,9 +1146,12 @@ class App(ctk.CTk):
 
         file_path = os.path.abspath(self.practical_graph_file)
         graph = self.graph_io.load_graph(file_path, self.images_dir)
-        for test_class_ref in selected_test_classes:
-            test_instance = test_class_ref(graph, self.test_solution_file)
-            print(f"[INFO] Running test: {test_class_ref.__name__}")
+        for test_class_name in selected_test_classes:
+
+            test_instance = self.test_instances[test_class_name]
+            test_instance.graph = graph  
+            test_instance.graph_file = self.test_solution_file
+
             test_instance.run()
             test_instance.write_solution()
         
