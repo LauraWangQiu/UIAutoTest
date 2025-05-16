@@ -37,6 +37,8 @@ class GenerateGraph:
         self.phantom_state_counter = 0
         self.buttons_dir = "buttons"
         self.default_state_name = "State_"
+        self.debug_name = "Debug"
+        self.full_debug_name = os.path.join(self.full_images_dir, self.debug_name)
         
     def generate_graph(self):
         print("Generating graph for " + str(self.selected_executable))
@@ -97,6 +99,9 @@ class GenerateGraph:
         if not state_folders:
             print("[LOOP] No states found.")
             return
+        if not os.path.exists(self.full_debug_name):
+                os.makedirs(self.full_debug_name)
+
         self._ensure_executable_running()
         self.graph.set_start_node(self._dfs_state())
         print("[LOOP] DFS graph loop finished.")
@@ -143,6 +148,7 @@ class GenerateGraph:
 
         if current_state is not None:
             found = False
+            self.sikuli.capture_error(current_state_name, self.full_debug_name)
             if current_state not in self.visited_states:
                 print("[DFS] Visiting state: " + str(current_state))
                 self.visited_states.add(current_state)
@@ -181,13 +187,17 @@ class GenerateGraph:
                         for idx, btn in enumerate(buttons_input_path_names):
                             btn_path = os.path.join(buttons_input_path, btn)
                             print("[DFS] Simulating " + action_type + " with button image: " + str(btn_path))
+                            if self.lastInput is not None and len(self.inputs[self.lastInput]) >= 1:
+                                print ("Desde ruta: "  + str(self.inputs[self.lastInput]))
+                            print(current_state_name + " Nombreeeeeeeeeeeeeeeeeeeeeeeeeee")
                             self.lastInput = action_type
+                            self.sikuli.capture_error(btn, self.full_debug_name)
                             result = self.do_action(action_type, btn_path)
                             if not result:
                                 print("[DFS] Could not " + self.lastInput + " on: " + str(btn_path))
                                 continue
                             
-                            found = True
+                            found = True                            
                             time.sleep(self.delay)
                             self.add_inputs_to_path(btn_path)
                             dst_node = self._dfs_state()
@@ -195,9 +205,10 @@ class GenerateGraph:
                             transition = self.graph.add_transition(current_state, dst_node)
                             transition.update_action(action_type)
                             transition.update_image(btn_path)
-
-            if not found:
-                self._restart_executable_and_continue()
+                        
+                #self._restart_executable_and_continue()
+            
+            self._restart_executable_and_continue()
 
         else:
             print("[DFS] Current state not found")
@@ -249,16 +260,20 @@ class GenerateGraph:
 
     def _restart_executable_and_continue(self):
         self._stop_executable()
+        
         if (self.lastInput is None or self.inputs[self.lastInput] is None or len(self.inputs[self.lastInput]) == 0):
             print("[INFO] AAAAAAA.")
             return
+        print("Begin " + str(self.inputs[self.lastInput]))
         self.inputs[self.lastInput].pop()
+        print("Began/Begun " + str(self.inputs[self.lastInput]))
+       
         if (self.inputs[self.lastInput] is None or len(self.inputs[self.lastInput]) == 0):
             print("[INFO] BBBBBBB.")
             return
         self._ensure_executable_running()
         self.navigate_to_state(self.inputs[self.lastInput])
-        self.lastInput = None
+        
 
     def add_inputs_to_path(self, btn_path):
         self.inputs[self.lastInput].append(btn_path)
@@ -269,6 +284,7 @@ class GenerateGraph:
         for idx, btn_path in enumerate(clicks_path):
             print("[NAVIGATE] (" + str(idx+1) + "/" + str(len(clicks_path)) + ") Clicking on: " + str(btn_path))
             self.sikuli.click_image(btn_path, timeout=timeout, retries=8, similarity_reduction=0.05)
+            time.sleep(self.delay)
         print("[NAVIGATE] Click sequence completed.")
 
     def _ensure_executable_running(self):
