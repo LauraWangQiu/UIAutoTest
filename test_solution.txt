@@ -1,0 +1,7 @@
+[COMPARING GENERATED GRAPH vs GIVEN GRAPH]
+[COMPARING GIVEN GRAPH vs GENERATED GRAPH]
+[NO DIFFERENCES FOUND]
+Total Connectivity Test:
+--There are not non-visited nodes.
+--Non-visited transitions: 
+--There are not non-visited transitions.

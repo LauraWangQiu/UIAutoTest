@@ -968,7 +968,6 @@ class App(ctk.CTk):
         # Run tests button
         run_button = ctk.CTkButton(test_runner_tab, text="Run Tests", command=self.run_tests)
         run_button.pack(pady=10)
-
         # Compare button
         compare_button = ctk.CTkButton(test_runner_tab, text="Compare Results", command=self.compare)
         compare_button.pack(pady=10)
@@ -1099,14 +1098,14 @@ class App(ctk.CTk):
                     threading.Timer(1.0, _check).start()
             else:
                 print("[INFO] Jython thread finished.")
-                self.execute_tests(selected_test_classes)
+                self.execute_selected_tests(selected_test_classes)
 
         _check()
 
     """
         Execute the selected tests
     """
-    def execute_tests(self, selected_test_classes):
+    def execute_selected_tests(self, selected_test_classes):
         file_path = os.path.abspath(self.practical_graph_file)
         graph = self.graph_io.load_graph(file_path, self.images_dir)
         for test_class_ref in selected_test_classes:
@@ -1120,10 +1119,73 @@ class App(ctk.CTk):
     """
         Compare the generated graph with specified graph
     """
+
     def compare(self):
-        # TODO: Get the file generated and the expected graph and compare them
-        # Also, save the generated results of the tests
+        file_path = os.path.abspath(self.practical_graph_file)
+        generated_graph = self.graph_io.load_graph(file_path, self.images_dir)
         print("Comparing results...")
+        differences_found = 0
+        with open(self.test_solution_file, "w") as f:
+            print("[INFO] Comparing generated graph with given graph...")
+            f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
+            differences_found += self.compare_aux(generated_graph, self.graph, f)
+            print("[INFO] Comparing given graph with generated graph...")
+            f.write("[COMPARING GIVEN GRAPH vs GENERATED GRAPH]\n")
+            differences_found += self.compare_aux(self.graph, generated_graph, f)
+            if differences_found == 0:
+                f.write("[NO DIFFERENCES FOUND]\n")
+
+    def compare_aux(self, graph1:Graph, graph2:Graph, file_output):
+        differences_found = 0
+        for node1 in graph1.nodes:
+            print("[INFO] Comparing node: " + node1.name)
+            node2 = graph2.get_node_image(node1.image)
+            if node2 is None: # Node is not in generated graph
+                print("[INFO] Node not found: " + node1.name)
+                file_output.write("[MISSING NODE] " + node1.name + " not in graph2\n")
+                differences_found += 1
+                continue
+
+            for trans1 in node1.transitions:
+                dest_image = trans1.destination.image
+                found = False
+                
+                for trans2 in node2.transitions:
+                    print("[INFO] Comparing transition: " + trans1.image)
+                    if trans2.image == trans1.image:
+                        print("[INFO] Transition found: " + trans1.image)
+                        if trans2.destination.image != dest_image:
+                            print("[INFO] Transition mismatch: " + trans1.image)
+                            # Writes the objetive destination and the real destination
+                            file_output.write("[MISMATCH TRANSITION] Supposed: " + node1.name + " -/-> " + trans1.destination.name + " Real: " + node1.name +" -> " + trans2.destination.name + "\n")
+                            differences_found += 1
+                        found = True
+                        continue
+                if not found:
+                    print("[INFO] Transition not found: " + trans1.image)
+                    file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + "\n")
+                    differences_found += 1
+        return differences_found
+    """
+        Adds a test to the list of tests to be executed
+    """
+    def add_test_to_Execute(self, test):
+        if test not in self.test_to_execute:
+            self.test_to_execute.append(test)
+            
+    def add_tests_to_Execute(self, tests_list):
+        self.test_to_execute = tests_list
+    
+    """
+        Execute all tests in the graph.
+    """
+    def execute_tests(self):
+        for test in self.test_to_execute:
+            if isinstance(test, Test):
+                test.run()
+                test.write_solution(self.file_output)
+            else:
+                print(f"Test {test} is not a valid Test instance.")
 
     # ==============================================================================================
     # TERMINAL TAB
