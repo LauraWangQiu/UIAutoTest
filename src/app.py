@@ -34,36 +34,39 @@ class App(ctk.CTk):
                 images_dir, tests_dir, 
                 theorical_graph_file,
                 practical_graph_file,
+                generate_graph,
                 selected_executable,
                 executable_delay,
                 tests_to_run,
                 test_solution_file,
                 headless=False):
-        self.java_path = java_path                          # Path to Java executable
-        self.jython_jar = jython_jar                        # Path to Jython jar file
-        self.sikulix_jar = sikulix_jar                      # Path to SikuliX jar file
-        self.sikuli_script = sikuli_script                  # Path to Sikuli script
-        self.jython_process = None                          # Jython process
-        self.jython_thread = None                           # Jython thread
-
-        self.graph_io = GraphIO()                           # GraphIO instance
-        self.graph = Graph()                                # Theorical graph
-        self.graph_exe = Graph()                            # Practical graph
-        self.theorical_graph_file   = theorical_graph_file  # Theoretical graph file
-        self.practical_graph_file   = practical_graph_file  # Practical graph file
-        self.images_dir             = images_dir            # Directory of images
-        self.tests_dir              = tests_dir             # Directory of tests
-        self.test_classes = self.get_test_classes()
-        self.selected_executable    = selected_executable   # Selected executable path
-        self.executable_delay       = executable_delay      # Delay for the executable to start
-        self.tests_to_run           = tests_to_run          # List of tests to run
-        self.test_solution_file     = test_solution_file    # Test solution file
-        self.headless               = headless              # Store the headless mode flag
+        self.java_path = java_path                                      # Path to Java executable
+        self.jython_jar = jython_jar                                    # Path to Jython jar file
+        self.sikulix_jar = sikulix_jar                                  # Path to SikuliX jar file
+        self.sikuli_script = sikuli_script                              # Path to Sikuli script
+        self.jython_process = None                                      # Jython process
+        self.jython_thread = None                                       # Jython thread
+            
+        self.graph_io = GraphIO()                                       # GraphIO instance
+        self.graph = Graph()                                            # Theorical graph
+        self.graph_exe = Graph()                                        # Practical graph
+        self.theorical_graph_file   = theorical_graph_file              # Theoretical graph file
+        self.practical_graph_file   = practical_graph_file              # Practical graph file
+        self.generate_graph         = generate_graph                    # Flag to generate graph
+        self.images_dir             = images_dir                        # Directory of images
+        self.tests_dir              = tests_dir                         # Directory of tests
+        self.test_classes = self.get_test_classes()         
+        self.selected_executable    = selected_executable               # Selected executable path
+        self.executable_delay       = executable_delay                  # Delay for the executable to start
+        self.tests_to_run           = tests_to_run                      # List of tests to run
+        self.test_solution_file     = test_solution_file                # Test solution file
+        self.headless               = headless                          # Store the headless mode flag
 
         if self.headless:
             print("[INFO] Application initialized in headless mode")
             self.load_graph_from_file(self.theorical_graph_file)
-            self.generate_graph_from_executable()
+            if self.generate_graph:
+                self.generate_graph_from_executable()
             self.run_tests()
         else: 
             super().__init__()
@@ -530,7 +533,10 @@ class App(ctk.CTk):
 
         transition.input_type_frame = input_type_frame
 
-        input_types = ["NONE"] + [ActionType.CLICK, ActionType.DOUBLE_CLICK, ActionType.CLICK_AND_TYPE, ActionType.DRAG_AND_DROP]
+        input_types = [
+            value for name, value in vars(ActionType).items()
+            if not name.startswith("__") and not callable(value)
+        ]
 
         input_type_menu = ctk.CTkOptionMenu(
             input_type_frame,
@@ -1036,9 +1042,13 @@ class App(ctk.CTk):
 
         if not selected_test_classes:
             print("[INFO] No tests selected")
+            self.compare()
             return
         
-        self.check_jython_thread(selected_test_classes)
+        if self.generate_graph:
+            self.check_jython_thread(selected_test_classes)
+        else:
+            self.execute_selected_tests(selected_test_classes)
 
     """
         Run the Jython script to generate the graph
@@ -1106,13 +1116,19 @@ class App(ctk.CTk):
         Execute the selected tests
     """
     def execute_selected_tests(self, selected_test_classes):
+        # Erasing the test solution file.
+        open(self.test_solution_file, "w").close()
+        print("[INFO] Erasing test solution file...")
+
         file_path = os.path.abspath(self.practical_graph_file)
         graph = self.graph_io.load_graph(file_path, self.images_dir)
         for test_class_ref in selected_test_classes:
             test_instance = test_class_ref(graph, self.test_solution_file)
+            print(f"[INFO] Running test: {test_class_ref.__name__}")
             test_instance.run()
+            test_instance.write_solution()
         
-        # Directly compare the generated graph with the expected graph
+        # Directly compare the generated graph with the expected graph.
         if self.headless:
             self.compare()
 
@@ -1125,7 +1141,7 @@ class App(ctk.CTk):
         generated_graph = self.graph_io.load_graph(file_path, self.images_dir)
         print("Comparing results...")
         differences_found = 0
-        with open(self.test_solution_file, "w") as f:
+        with open(self.test_solution_file, "a") as f:
             print("[INFO] Comparing generated graph with given graph...")
             f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
             differences_found += self.compare_aux(generated_graph, self.graph, f)

@@ -18,9 +18,9 @@ class Node:
     def set_image(self, image_path):
         if path.exists(image_path):
             self.image = image_path
-            print("[INFO] Image set to '" + image_path + "' for node " + self.name + " .")
+            print("[INFO] Image set to '" + image_path + "' for node " + self.name)
         else:
-            print("[ERROR] Image path '" + image_path + "' does not exist.")
+            print("[ERROR] Image path '" + image_path + "' does not exist")
 
     def add_transition(self, transition):
         self.transitions.append(transition)

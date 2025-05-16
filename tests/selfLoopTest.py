@@ -28,12 +28,12 @@ class SelfLoopTest(Test):
     def write_solution(self):
         try:
             with open(self.graph_file, "a") as file:
-                file.write("Self Loop Test:\n")
+                file.write("[SELF LOOP TEST]\n")
                 if not self.selfLoopList:
-                    file.write("List is empty\n")
+                    file.write("\n")
                 else:
                     for node in self.selfLoopList:
-                        file.write(F"- The node '{node.name}' has self loop edges\n")
+                        file.write("[SELF LOOP NODE ]" + node.name + "\n")   
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:

@@ -44,6 +44,7 @@ if __name__ == "__main__":
     tests_dir =             config.get("tests_dir", "tests")
     theorical_graph_file =  config.get("theorical_graph_file", "graph.txt")
     practical_graph_file =  config.get("practical_graph_file", "output_graph.txt")
+    generate_graph =        config.get("generate_graph", True)
     selected_executable =   config.get("selected_executable", None)
     executable_delay =      config.get("executable_delay", "5")
     tests_to_run =          config.get("tests_to_run", [])
@@ -62,6 +63,7 @@ if __name__ == "__main__":
         tests_dir=tests_dir,
         theorical_graph_file=theorical_graph_file,
         practical_graph_file=practical_graph_file,
+        generate_graph=generate_graph,
         selected_executable=selected_executable,
         executable_delay=executable_delay,
         tests_to_run=tests_to_run,
