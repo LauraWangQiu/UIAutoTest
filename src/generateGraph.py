@@ -156,7 +156,7 @@ class GenerateGraph:
                     
         if buttons_input_path is None or not os.path.isdir(buttons_input_path):
             print("[DFS] No buttons folder found in " + str(state_path))
-            self._restart_executable_and_continue()
+            self._restart_executable_and_continue(pop=False)
             return
         
         # For each transition button
@@ -178,9 +178,10 @@ class GenerateGraph:
 
             dest_state_path = None
             initial_similarity = 0.99
-            min_similarity = 0.70
+            min_similarity = 0.85
             similarity_step = 0.01
             similarity = initial_similarity
+            timeout = 2
 
             # Checks the screen for the next state
             while similarity >= min_similarity and dest_state_path is None:
@@ -199,7 +200,7 @@ class GenerateGraph:
                     # There must be at least one image and the first one selected is the main state image
                     candidate_state_path = os.path.join(candidate_path, candidate_states[0])
                     print("[DFS] Checking if the screen matches: " + str(candidate_state_path))
-                    if self.sikuli.search_image_once(candidate_state_path, timeout=0.1, similarity=similarity):
+                    if self.sikuli.search_image_once(candidate_state_path, timeout=timeout, similarity=similarity):
                         dest_state_path = candidate_path
                         print("[DFS] The screen matches with state: " + str(dest_state_path))
                         break
@@ -234,7 +235,7 @@ class GenerateGraph:
                 # Increment the counter
                 self.phantom_state_counter += 1
                 # ---------- END PHANTOM BLOCK -----------
-                self._restart_executable_and_continue()
+                self._restart_executable_and_continue(pop=False)
 
     def do_action(self, action_type, btn_path, text=None, btn2_path=None, similarity=1.0, timeout=0.01, retries=6, similarity_reduction=0.1, clear_before=False):
         if action_type is None or not ActionType.is_valid_action(action_type):
@@ -265,10 +266,11 @@ class GenerateGraph:
         self.lastInput = action_type
         return result
 
-    def _restart_executable_and_continue(self):
+    def _restart_executable_and_continue(self, pop=True):
         self._stop_executable()
         self._ensure_executable_running()
-        self.inputs[self.lastInput].pop()
+        if pop:
+            self.inputs[self.lastInput].pop()
         self.navigate_to_state(self.inputs[self.lastInput])
 
     def add_inputs_to_path(self, btn_path):
