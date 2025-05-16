@@ -7,7 +7,6 @@ py_sys = PySystemState()
 py_sys.path.append("sikulixapi-2.0.5.jar")
 
 from org.sikuli.script import Screen, Pattern, Key, KeyModifier
-from org.sikuli.basics import Settings
 
 """
 Decorator to turn a class into a Singleton.
@@ -30,8 +29,6 @@ def singleton(cls):
 class SikulixWrapper:
     def __init__(self):
         self.screen = Screen()
-        Settings.MinTargetSize = 0.5  
-        Settings.MaxTargetSize = 2.0
 
     """
     Attempt to locate the given image on screen several times.
@@ -43,7 +40,7 @@ class SikulixWrapper:
     :param similarity_reduction: Amount to reduce similarity per attempt.
     :return: True if the image was found; False otherwise.
     """
-    def search_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction = 0.1 ):
+    def search_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1):
         print("[INFO] Searching for image: " + image_path)
         for attempt in range(retries):
             actual_attempt = attempt + 1
@@ -58,15 +55,15 @@ class SikulixWrapper:
 
         return False
     
-    def search_image_once(self, image_path, similarity=1.0, timeout=2):
-        """
+    """
         Search for an image on the screen once.
 
         :param image_path: Path to the image file to search for.
         :param similarity: Similarity threshold (0.0–1.0).
         :param timeout: How many seconds to wait.
         :return: True if the image was found; False otherwise.
-        """
+    """
+    def search_image_once(self, image_path, similarity=1.0, timeout=2):
         print("[INFO] Searching for image (once): " + image_path)
         match = self.screen.exists(Pattern(image_path).similar(similarity), timeout)
         if match:

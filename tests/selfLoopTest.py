@@ -42,7 +42,7 @@ class SelfLoopTest(Test):
             with open(self.graph_file, "a") as file:
                 file.write("[SELF LOOP TEST]\n")
                 if not self.selfLoopList:
-                    file.write("\n")
+                    file.write("No self loops found\n")
                 else:
                     for node in self.selfLoopList:
                         file.write("[SELF LOOP NODE ]" + node.name + "\n")   
