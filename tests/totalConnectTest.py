@@ -20,8 +20,6 @@ class TotalConnectTest(Test):
                 self.visited_transitions.add(transition)
                 self.visited_states.add(transition.destination)
 
-        self.write_solution()
-
     """
         Overrides the parent write_solution method
     """

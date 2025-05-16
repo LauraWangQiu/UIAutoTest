@@ -27,8 +27,6 @@ class EdgePairCovTest(Test):
         else:
             for origin, dest in self.EdgePairCovList:
                 print(F"- From '{origin}' to '{dest}' has multiple transitions\n")
-                
-        self.write_solution()
 
     def write_solution(self):
         try:
