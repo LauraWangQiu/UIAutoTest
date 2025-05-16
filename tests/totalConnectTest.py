@@ -28,24 +28,24 @@ class TotalConnectTest(Test):
     def write_solution(self):
         try:
             with open(self.graph_file, "a") as file:
-                file.write("Total Connectivity Test:\n")
+                file.write("[TOTAL CONNECTIVITY TEST]\n")
+                file.write("[NON-VISITED NODES] \n")
                 if len(self.visited_states) == len(self.graph.nodes):
-                    file.write("--There are not non-visited nodes.\n")
+                    file.write("There are not non-visited nodes\n")
                     pass
                 else:
-                    file.write("--Non-visited nodes: \n")
                     for node in self.graph.nodes:
                         if node not in self.visited_states:
-                            file.write(node.name + "\n")
-                file.write("--Non-visited transitions: \n")
+                            file.write("[NODE NOT VISITED] " + node.name + "\n")
+                file.write("[NON-VISITED TRANSITIONS]\n")
                 aux = 0
                 for node in self.graph.nodes:
                     for transition in node.transitions:
                         if transition not in self.visited_transitions:
                             aux += 1
-                            file.write("Transition: " + node.name + "-" + transition.destination + "\n")
+                            file.write("[TRANSITION NOT VISITED] " + node.name + "-" + transition.destination + "\n")
                 if aux == 0:
-                    file.write("--There are not non-visited transitions.\n")
+                    file.write("There are not non-visited transitions\n")
 
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))

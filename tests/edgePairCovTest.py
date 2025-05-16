@@ -33,10 +33,10 @@ class EdgePairCovTest(Test):
     def write_solution(self):
         try:
             with open(self.graph_file, "a") as file:
-                file.write("Edge Pair Cov Test:\n")
+                file.write("[EDGE PAIR COVERAGE TEST]\n")
                 # Write the results of the test
                 if not self.EdgePairCovList:
-                    file.write("List is empty\n")
+                    file.write("No edge pairs found\n")
                 else:
                     for origin, dest in self.EdgePairCovList:
                         file.write(F"- From '{origin}' to '{dest}' has multiple transitions\n")
