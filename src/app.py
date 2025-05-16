@@ -508,7 +508,7 @@ class App(ctk.CTk):
     def add_connection_to_node(self, node, selected_name):
         for n in self.graph.nodes:
             if n.name == selected_name:
-                new_transition = Transition(n, lambda: True)
+                new_transition = Transition(n)
                 node.add_transition(new_transition)
                 break
 

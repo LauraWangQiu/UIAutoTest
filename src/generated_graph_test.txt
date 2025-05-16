@@ -1,9 +1,0 @@
-v A prueba.png
-v B prueba2.png
-v C unity.png
-v D D_state.png
-
-e CLICK A B imagen2.png
-e CLICK B A boton3.png
-e CLICK C A carpeta.png
-e CLICK C D explorer.png 
