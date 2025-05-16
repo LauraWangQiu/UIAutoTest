@@ -1,9 +1,8 @@
 from test import Test
 
 class SelfLoopTest(Test):
-    def __init__(self, graph=None):
-        super().__init__("SP Test")
-        self.graph = graph
+    def __init__(self, graph=None, graph_file=None):
+        super().__init__("SP Test", graph, graph_file)
         self.selfLoopList = set()
 
     """
@@ -11,31 +10,31 @@ class SelfLoopTest(Test):
     """
     def run(self):
         print("Running " + self.name + ".")
+        self.selfLoopList.clear()
+
         for node in self.graph.nodes:
-            #See all the transitions of the node
+            # See all the transitions of the node
             for transitions in node.transitions:
-                #If the destination is the same node
+                # If the destination is the same node
                 if transitions.destination is node:
-                    print("SelfLoop in node: {node.name}")
-                    self.selfLoopList(node)
+                    print("SelfLoop in node: " + node.name)
+                    self.selfLoopList.add(node)
                     break
-                else: print("Nop SelfLoop")
+                else:
+                    print("Not SelfLoop")
 
-    def write_solution(self, graph_file):
+        self.write_solution()
+
+    def write_solution(self):
         try:
-            #Le pasamos la "a" para que lo escriba al final, con "w" elimina lo anterior
-            with open(graph_file, "a") as file:
+            with open(self.graph_file, "a") as file:
                 file.write("Self Loop Test:\n")
-
-                # Write the results of the test
                 if not self.selfLoopList:
-                    file.write ("La lista está vacia\n")
+                    file.write("List is empty\n")
                 else:
                     for node in self.selfLoopList:
                         file.write(F"- The node '{node.name}' has self loop edges\n")
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
-            print("[INFO] Test data from: " + self.name + " successfully written to " + graph_file)
-
-        
+            print("[INFO] Test data from: " + self.name + " successfully written to " + self.graph_file)

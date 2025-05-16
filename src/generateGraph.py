@@ -7,7 +7,8 @@ import subprocess
 import threading
 import time
 from sikulixWrapper import SikulixWrapper
-from graphsDef import Graph, Node, Transition
+from graphsDef import Graph, Transition
+from actionTypes import ActionType
 import GraphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
 
@@ -18,11 +19,10 @@ class GenerateGraph:
         self.images_dir = images_dir
         self.practical_graph_file = practical_graph_file
         self.selected_executable = selected_executable
+        self.visited_states = set()
+        self.full_images_dir = os.path.join(os.getcwd(), self.images_dir)
         self.graph = Graph()
-        self.node_inputs = []
         self.delay = delay
-        self.actual_node = None
-        self.start_node = None
         self.process = None
         self.sikuli = SikulixWrapper()        
         self.graph_io = GraphIO()  
@@ -43,7 +43,13 @@ class GenerateGraph:
         self._executable_thread.join()
 
         self._stop_executable()
-        self.graph_io.write_graph(self.practical_graph_file, self.graph)
+        for node in self.graph.nodes:
+            print("[INFO] Node: " + str(node.name))
+            for transition in node.transitions:
+                print("[INFO] Transition: " + str(transition.action) + " -> " + str(transition.destination.name))
+                print("[INFO] Image: " + str(transition.image))
+
+        self.graph_io.write_graph(self.images_dir, self.practical_graph_file, self.graph)
         print("[INFO] graph has been saved to " + str(self.practical_graph_file))
 
     def _start_executable(self):
@@ -79,24 +85,20 @@ class GenerateGraph:
     # --- DFS recursivo ---
     def _loop(self):
         print("[LOOP] Starting DFS graph generation loop...")
-        actual_path = os.getcwd()
-        self_path = os.path.join(actual_path, self.images_dir)
-        visited_states = set()
-        # Primer estado (elige uno, por ejemplo el primero encontrado)
-        state_folders = [os.path.join(self_path, d) for d in os.listdir(self_path) if os.path.isdir(os.path.join(self_path, d))]
+        # Check if the images directory exists
+        state_folders = [os.path.join(self.full_images_dir, d) for d in os.listdir(self.full_images_dir) if os.path.isdir(os.path.join(self.full_images_dir, d))]
         if not state_folders:
             print("[LOOP] No states found.")
             return
         self._ensure_executable_running()
-        start_state = state_folders[0]
-        self._dfs_state(start_state, visited_states, self_path,[])
+        # Selects the first state folder
+        self._dfs_state(state_folders[0], self.full_images_dir, [])
         print("[LOOP] DFS graph loop finished.")
         self._stop_executable()
         self._stop_loop.set()
 
-    def _dfs_state(self, state_path, visited_states, base_path, clicks_path):
-
-        if state_path in visited_states:
+    def _dfs_state(self, state_path, base_path, clicks_path):
+        if state_path in self.visited_states:
             self._stop_executable()
             self._ensure_executable_running()
             print("[DFS] State already visited: " + str(state_path))
@@ -104,7 +106,7 @@ class GenerateGraph:
             self.navigate_to_state(clicks_path)
             return
         print("[DFS] Visiting state: " + str(state_path))
-        visited_states.add(state_path)
+        self.visited_states.add(state_path)
 
         # Search for the main image of the state (only one, the first found)
         images = [f for f in os.listdir(state_path)
@@ -114,27 +116,28 @@ class GenerateGraph:
             print("[DFS] No main image in " + str(state_path))
             return
         image_menu = os.path.join(state_path, images[0])
+        node_name = os.path.splitext(images[0])[0]
+        node = self.graph.get_node(node_name)
         print("[DFS] Main image selected: " + str(image_menu))
+        print("[DFS] Node name: " + str(node_name))
+        print("[DFS] Node: " + str(node))
 
-        # Relative path from imgs
-        relativa = image_menu.split("imgs", 1)[1]
-        if not relativa.startswith(os.sep) and not relativa.startswith("/"):
-            relativa = os.sep + relativa
-
-        node = self.graph.get_node(images[0])
-        print("[DFS] Node obtained: " + str(images[0]))
         if node is None:
-            nombre_sin_extension = os.path.splitext(images[0])[0]
             print("[DFS] Node does not exist, it will be created with image: " + str(image_menu))
-            self.graph.add_node_with_image(nombre_sin_extension, image_menu)
-            node = self.graph.get_node(nombre_sin_extension)
-            print("[DFS] Node created: " + str(nombre_sin_extension) + " with image: " + str(image_menu))
-
+            self.graph.add_node_with_image(node_name, image_menu)
+            node = self.graph.get_node(node_name)
+            print("[DFS] Node created: " + str(node_name) + " with image: " + str(image_menu))
+    
         # Buttons folder (transitions)
-        buttons_click_path = os.path.join(state_path, "buttons", "click")
-        print("[DFS] Buttons path: " + str(buttons_click_path))
+        action = ActionType.CLICK
+        buttons_click_path = os.path.join(state_path, "buttons", action.lower())
+        # buttons_double_click_path = os.path.join(state_path, "buttons", "double_click")
+        # buttons_click_and_type_path = os.path.join(state_path, "buttons", "click_and_type")
+        # buttons_drag_and_drop_path = os.path.join(state_path, "buttons", "drag_and_drop")
+
+        print("[DFS] Click buttons path: " + str(buttons_click_path))
         if not os.path.isdir(buttons_click_path):
-            print("[DFS] No buttons folder in " + str(buttons_click_path))
+            print("[DFS] No click buttons folder in " + str(buttons_click_path))
             self._stop_executable()
             self._ensure_executable_running()
             clicks_path.pop()
@@ -146,10 +149,10 @@ class GenerateGraph:
         print("[DFS] Buttons found: " + str(buttons))
         for idx, btn in enumerate(buttons):
             btn_path = os.path.join(buttons_click_path, btn)
-            print("[DFS] Simulating click on: " + str(btn_path))
+            print("[DFS] Simulating " + action + " on: " + str(btn_path))
             result = self.sikuli.click_image(btn_path, timeout=0.01)
             if not result:
-                print("[DFS] Could not click on: " + str(btn_path))
+                print("[DFS] Could not " + action + " on: " + str(btn_path))
                 continue
             self.add_click_to_path(clicks_path, btn_path)  # save the clicks
 
@@ -178,25 +181,27 @@ class GenerateGraph:
                 similarity -= similarity_step
 
             if dest_state_path is not None:
-                print("[DFS] Creating transition from node: " + str(node) + " with image: " + str(btn_path))
-                transition = Transition(node)
-                transition.image = btn_path
-                transition.action = "CLICK"
-                node.add_transition(transition)
+                print("[DFS] Creating transition from node: " + str(node_name) + " with image: " + str(btn_path))
+                dst_node_name = os.path.splitext(os.path.basename(dest_state_path))[0]
+                print("[DFS] Destination node name: " + str(dst_node_name))
+                dst_node = self.graph.add_node_with_image(dst_node_name, candidate_image_path)
+                transition = self.graph.add_transition(node, dst_node)
+                transition.update_action(action)
+                transition.update_image(btn_path)
                 print("[DFS] Transition added. Recursively calling _dfs_state with destination: " + str(dest_state_path))
-                self._dfs_state(dest_state_path, visited_states, base_path, clicks_path)
+                self._dfs_state(dest_state_path, base_path, clicks_path)
             else:
                 print("[DFS] Destination state not found for button " + str(btn))
 
                 phantom_node_name = "phantom_state" + str(self.phantom_state_counter)
 
                 # Build imgs directory path (search from base_path or state_path)
-                if "imgs" in base_path:
-                    imgs_index = base_path.lower().find("imgs")
-                    imgs_root = base_path[:imgs_index + len("imgs")]
-                elif "imgs" in state_path:
-                    imgs_index = state_path.lower().find("imgs")
-                    imgs_root = state_path[:imgs_index + len("imgs")]
+                if self.images_dir in base_path:
+                    imgs_index = base_path.lower().find(self.images_dir)
+                    imgs_root = base_path[:imgs_index + len(self.images_dir)]
+                elif self.images_dir in state_path:
+                    imgs_index = state_path.lower().find(self.images_dir)
+                    imgs_root = state_path[:imgs_index + len(self.images_dir)]
                 else:
                     imgs_root = base_path  # Fallback
 
