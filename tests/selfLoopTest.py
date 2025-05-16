@@ -16,8 +16,8 @@ class SelfLoopTest(Test):
             for transitions in node.transitions:
                 #If the destination is the same node
                 if transitions.destination is node:
-                    print("SelfLoop in node: {node.name}")
-                    self.selfLoopList(node)
+                    print("SelfLoop in node: " + node.name)
+                    self.selfLoopList.add(node)
                     break
                 else: print("Nop SelfLoop")
 
@@ -29,7 +29,7 @@ class SelfLoopTest(Test):
 
                 # Write the results of the test
                 if not self.selfLoopList:
-                    file.write ("La lista está vacia\n")
+                    file.write("List is empty\n")
                 else:
                     for node in self.selfLoopList:
                         file.write(F"- The node '{node.name}' has self loop edges\n")

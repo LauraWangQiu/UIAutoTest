@@ -25,7 +25,7 @@ class EdgePairCovTest(Test):
                         print(f"Multiple transitions ({count}) from '{node.name}' to '{dest_name}'")
 
         if not self.EdgePairCovList:
-            print ("La lista está vacia")
+            print ("List is empty")
         else:
             for origin, dest in self.EdgePairCovList:
                 print(F"- From '{origin}' to '{dest}' has multiple transitions\n")
@@ -36,7 +36,7 @@ class EdgePairCovTest(Test):
                 file.write("Edge Pair Cov Test:\n")
                 # Write the results of the test
                 if not self.EdgePairCovList:
-                    file.write ("La lista está vacia\n")
+                    file.write("List is empty\n")
                 else:
                     for origin, dest in self.EdgePairCovList:
                         file.write(F"- From '{origin}' to '{dest}' has multiple transitions\n")

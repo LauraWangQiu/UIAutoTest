@@ -156,7 +156,7 @@ class GraphIO:
                 # Iterate nodes and write only the vertices, but accumulate edges
                 for node in graph.nodes:
                     node_name = node.name.replace(" ", "_")
-                    image_name = node.image.split(images_dir, 1)[1]
+                    image_name = node.image.split(images_dir, 1)[1].lstrip("/\\")
                     f.write("v " + node_name + " " + image_name + "\n")
 
                     for trans in node.transitions:
@@ -164,16 +164,16 @@ class GraphIO:
                         dst = trans.destination.name.replace(" ", "_")
 
                         if act in ("CLICK", "DOUBLE_CLICK"):
-                            image_name = trans.image.split(images_dir, 1)[1]
+                            image_name = trans.image.split(images_dir, 1)[1].lstrip("/\\")
                             edge_lines.append("e " + act + " " + node_name + " " + dst + " " + image_name + "\n")
 
                         elif act == "CLICK_AND_TYPE":
-                            image_name = trans.image.split(images_dir, 1)[1]
+                            image_name = trans.image.split(images_dir, 1)[1].lstrip("/\\")
                             edge_lines.append("e " + act + " " + node_name + " " + dst + " " + image_name + " " + trans.text + "\n")
 
                         elif act == "DRAG_AND_DROP":
-                            drag_image_name = trans.drag_image.split(images_dir, 1)[1]
-                            drop_image_name = trans.drop_image.split(images_dir, 1)[1]
+                            drag_image_name = trans.drag_image.split(images_dir, 1)[1].lstrip("/\\")
+                            drop_image_name = trans.drop_image.split(images_dir, 1)[1].lstrip("/\\")
                             edge_lines.append("e " + act + " " + node_name + " " + dst + " " + drag_image_name + " " + drop_image_name + "\n")
 
                         else:
@@ -184,4 +184,3 @@ class GraphIO:
             print("[ERROR] Exception while writing the graph: " + str(e))
         else:
             print("[INFO] Graph successfully written to " + graph_file)
-

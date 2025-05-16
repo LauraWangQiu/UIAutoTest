@@ -71,21 +71,13 @@ class Node:
         drop_image (str): Drop image for DRAG_AND_DROP
 """
 class Transition:
-    def __init__(self, destination, condition= None):
+    def __init__(self, destination):
         self.destination = destination
-        self.condition = condition if condition is not None else (lambda: True)
         self.action = None
         self.image = None
         self.text = None
         self.drag_image = None
         self.drop_image = None
-
-    """
-        Check the condition of transition
-        Returns true if condition is valid, false otherwise
-    """
-    def is_valid(self):
-        return self.condition()
    
     def update_action(self, action):
         """Update the action type of this transition."""
@@ -167,13 +159,9 @@ class Graph:
 
     """
         Adds a transition to the graph
-        Returns False if the origin or destination node is not in the graph, True otherwise
+        Returns None if the origin or destination node is not in the graph, transition otherwise
     """
-    def add_transition(self, origin, destination, condition=None):
-        """
-        Adds a transition to the graph.
-        Returns the new Transition, or None if origin/destination are not in the graph.
-        """
+    def add_transition(self, origin, destination):
         if origin not in self.nodes or destination not in self.nodes:
             if origin not in self.nodes:
                 print("[ERROR] Origin node '" + origin.name + "' is not in the graph.")
@@ -181,8 +169,7 @@ class Graph:
                 print("[ERROR] Destination node '" + destination.name + "' is not in the graph.")
             return None
 
-        condition = condition if condition is not None else (lambda: True)
-        t = Transition(destination, condition)
+        t = Transition(destination)
         origin.add_transition(t)
         return t
 

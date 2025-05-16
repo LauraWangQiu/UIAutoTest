@@ -9,5 +9,6 @@
     "practical_graph_file": "output_graph.txt",
     "selected_executable": "bin/Sample/My project.exe",
     "executable_delay": "5",
-    "tests_to_run": ["EdgePairCovTest", "PrimePathCovTest", "SelfLoopTest", "TotalConnectTest"]
+    "tests_to_run": ["EdgePairCovTest", "PrimePathCovTest", "SelfLoopTest", "TotalConnectTest"],
+    "test_solution_file": "test_solution.txt"
 }

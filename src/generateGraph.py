@@ -114,22 +114,23 @@ class GenerateGraph:
             print("[DFS] No main image in " + str(state_path))
             return
         image_menu = os.path.join(state_path, images[0])
+        node_name = os.path.splitext(images[0])[0]
+        node = self.graph.get_node(node_name)
         print("[DFS] Main image selected: " + str(image_menu))
 
         # Relative path from imgs
-        relativa = image_menu.split("imgs", 1)[1]
+        relativa = image_menu.split(self.images_dir, 1)[1]
         if not relativa.startswith(os.sep) and not relativa.startswith("/"):
             relativa = os.sep + relativa
 
-        node = self.graph.get_node(images[0])
-        print("[DFS] Node obtained: " + str(images[0]))
+        node = self.graph.get_node(node_name)
+        print("[DFS] Node obtained: " + str(node_name))
         if node is None:
-            nombre_sin_extension = os.path.splitext(images[0])[0]
             print("[DFS] Node does not exist, it will be created with image: " + str(image_menu))
-            self.graph.add_node_with_image(nombre_sin_extension, image_menu)
-            node = self.graph.get_node(nombre_sin_extension)
-            print("[DFS] Node created: " + str(nombre_sin_extension) + " with image: " + str(image_menu))
-
+            self.graph.add_node_with_image(node_name, image_menu)
+            node = self.graph.get_node(node_name)
+            print("[DFS] Node created: " + str(node_name) + " with image: " + str(image_menu))
+    
         # Buttons folder (transitions)
         buttons_click_path = os.path.join(state_path, "buttons", "click")
         print("[DFS] Buttons path: " + str(buttons_click_path))
@@ -191,12 +192,12 @@ class GenerateGraph:
                 phantom_node_name = "phantom_state" + str(self.phantom_state_counter)
 
                 # Build imgs directory path (search from base_path or state_path)
-                if "imgs" in base_path:
-                    imgs_index = base_path.lower().find("imgs")
-                    imgs_root = base_path[:imgs_index + len("imgs")]
-                elif "imgs" in state_path:
-                    imgs_index = state_path.lower().find("imgs")
-                    imgs_root = state_path[:imgs_index + len("imgs")]
+                if self.images_dir in base_path:
+                    imgs_index = base_path.lower().find(self.images_dir)
+                    imgs_root = base_path[:imgs_index + len(self.images_dir)]
+                elif self.images_dir in state_path:
+                    imgs_index = state_path.lower().find(self.images_dir)
+                    imgs_root = state_path[:imgs_index + len(self.images_dir)]
                 else:
                     imgs_root = base_path  # Fallback
 
@@ -233,6 +234,10 @@ class GenerateGraph:
             print("[NAVIGATE] (" + str(idx+1) + "/" + str(len(clicks_path)) + ") Clicking on: " + str(btn_path))
             self.sikuli.click_image(btn_path, timeout=timeout, retries=8, similarity_reduction=0.05)
         print("[NAVIGATE] Click sequence completed.")
+        print("A: " + str(self.start_node))
+        print("B: " + str(self.actual_node))
+        # self.graph.add_transition(self.start_node, self.actual_node)
+        # self.start_node = self.actual_node
 
     def _ensure_executable_running(self):
         if self.process is None:

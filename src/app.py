@@ -37,6 +37,7 @@ class App(ctk.CTk):
                 selected_executable,
                 executable_delay,
                 tests_to_run,
+                test_solution_file,
                 headless=False):
         self.java_path = java_path                          # Path to Java executable
         self.jython_jar = jython_jar                        # Path to Jython jar file
@@ -56,6 +57,7 @@ class App(ctk.CTk):
         self.selected_executable    = selected_executable   # Selected executable path
         self.executable_delay       = executable_delay      # Delay for the executable to start
         self.tests_to_run           = tests_to_run          # List of tests to run
+        self.test_solution_file     = test_solution_file    # Test solution file
         self.headless               = headless              # Store the headless mode flag
 
         if self.headless:
@@ -84,9 +86,8 @@ class App(ctk.CTk):
     """
     def load_graph_from_file(self, file_name):
         try:
-            self.graph = self.graph_io.load_graph(file_name, "imgs")
+            self.graph = self.graph_io.load_graph(file_name, self.images_dir)
             print("[INFO] Graph successfully loaded")
-            #self.graph_io.write_graph("mi_graph.txt", self.graph)
         except FileNotFoundError:
             print("[ERROR] File " + file_name + " not found")
         except Exception as e:
@@ -1106,11 +1107,13 @@ class App(ctk.CTk):
         Execute the selected tests
     """
     def execute_tests(self, selected_test_classes):
+        file_path = os.path.abspath(self.practical_graph_file)
+        graph = self.graph_io.load_graph(file_path, self.images_dir)
         for test_class_ref in selected_test_classes:
-            test_instance = test_class_ref(self.graph_io.load_graph(self.practical_graph_file, self.images_dir))
+            test_instance = test_class_ref(graph)
             test_instance.run()
             # TODO: Do something with the tests results
-            test_instance.write_solution("output_graph.txt")
+            test_instance.write_solution(self.test_solution_file)
         
         # Directly compare the generated graph with the expected graph
         if self.headless:
