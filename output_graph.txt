@@ -1,0 +1,5 @@
+v B_menu B_menu\B_menu.png
+v A_menu A_menu\A_menu.png
+v C_menu C_menu\C_menu.png
+e CLICK B_menu C_menu B_menu\buttons\click\b2c.png
+e CLICK A_menu B_menu A_menu\buttons\click\a2a.png
