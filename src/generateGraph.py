@@ -2,6 +2,7 @@
 import argparse
 import os
 import subprocess
+import shutil
 import threading
 import time
 from sikulixWrapper import SikulixWrapper
@@ -14,14 +15,15 @@ GraphIO = _graph_io_module.GraphIO
 class GenerateGraph:
     valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp'}
 
-    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5, debug_images=False, timeout=2, initial_similarity=0.99, min_similarity=0.85, similarity_step=0.01, retries=8, state_reset_method=StateResetMethod.RELAUNCH, internal_reset_script=None):
+    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, executable_delay=5, transition_delay=1, debug_images=False, timeout=2, initial_similarity=0.99, min_similarity=0.85, similarity_step=0.01, retries=8, state_reset_method=StateResetMethod.NONE, external_reset_script=None):
         self.graph_io = GraphIO()  
         self.sikuli = SikulixWrapper()
 
         self.images_dir = images_dir
         self.practical_graph_file = practical_graph_file
         self.selected_executable = selected_executable
-        self.delay = delay
+        self.executable_delay = executable_delay
+        self.transition_delay = transition_delay
         self.debug_images = debug_images
         self.timeout = timeout
         self.initial_similarity = initial_similarity
@@ -29,7 +31,7 @@ class GenerateGraph:
         self.similarity_step = similarity_step
         self.retries = retries
         self.state_reset_method = state_reset_method
-        self.internal_reset_script = internal_reset_script
+        self.external_reset_script = external_reset_script
 
         self.graph = None
         self.visited_states = set()
@@ -40,6 +42,7 @@ class GenerateGraph:
         }
         self.similarity = 1
 
+        self.original_executable = self.selected_executable
         self.stop_loop = threading.Event()
         self.process = None
         self.executable_thread = None
@@ -48,15 +51,17 @@ class GenerateGraph:
         self.buttons_dir = "buttons"
         self.default_state_name = "State_"
         self.debug_name = "DebugImages"
+        self.temp_dir = "Temp"
         self.full_debug_name = os.path.join(os.getcwd(), self.debug_name)
         self.full_images_dir = os.path.join(os.getcwd(), self.images_dir)
+        self.full_temp_dir = os.path.join(os.getcwd(), self.temp_dir)
         
         self.phantom_state_counter = 0
         
     def generate_graph(self):
-        # Check if internal reset script is provided when the state reset method is INTERNAL_RESET
-        if self.state_reset_method == StateResetMethod.INTERNAL_RESET:
-            if not self.internal_reset_script:
+        # Check if external reset script is provided when the state reset method is EXTERNAL_RESET
+        if self.state_reset_method == StateResetMethod.EXTERNAL_RESET:
+            if not os.path.isfile(self.external_reset_script):
                 print("[ERROR] Internal reset script not provided.")
                 return
         
@@ -71,6 +76,10 @@ class GenerateGraph:
             print("[LOOP] No states found.")
             return
         
+        # Check if the needs to be copy reset
+        if self.state_reset_method == StateResetMethod.COPY_RESET:
+            self._copy_executable()
+            
         if self.debug_images and not os.path.exists(self.full_debug_name):
             os.makedirs(self.full_debug_name)
         
@@ -116,7 +125,7 @@ class GenerateGraph:
                 print("[INFO] Stopping executable: " + str(self.selected_executable))
                 self.process.terminate()
                 try:
-                    self.process.wait(timeout=self.delay)
+                    self.process.wait(timeout=self.executable_delay)
                 except Exception:
                     print("[INFO] Forcing the executable to stop...")
                     self.process.kill()
@@ -293,7 +302,7 @@ class GenerateGraph:
             result = self.sikuli.drag_and_drop(btn1_path, btn2_path, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step)
 
         # Add delay time after each action
-        time.sleep(self.delay)
+        time.sleep(self.transition_delay)
         return result, text
 
     def _restart_executable_and_continue(self):
@@ -311,14 +320,20 @@ class GenerateGraph:
         print("[INFO] Popping last input: " + str(self.lastInputs[-1]))
         self.lastInputs.pop()
         
-        # Check if the state reset method is set to relaunch, if so, run the user's internal reset script
-        if self.state_reset_method == StateResetMethod.INTERNAL_RESET:
-            if self.internal_reset_script:
-                print("[INFO] Running internal reset script: " + str(self.internal_reset_script))
+        # Check if the state reset method is set to none, if so, just relaunch the original executable
+        if self.state_reset_method == StateResetMethod.NONE:
+            self.selected_executable = self.original_executable
+        # Check if the state reset method is set to copy reset, if so, copy the original executable to temporary location
+        if self.state_reset_method == StateResetMethod.COPY_RESET:
+            self._copy_executable()
+        # Check if the state reset method is set to external reset, if so, run the user's external reset script
+        elif self.state_reset_method == StateResetMethod.EXTERNAL_RESET:
+            if self.external_reset_script:
+                print("[INFO] Running external reset script: " + str(self.external_reset_script))
                 try:
-                    subprocess.run([self.internal_reset_script], check=True)
+                    subprocess.run([self.external_reset_script], check=True)
                 except Exception as e:
-                    print("[ERROR] Failed to run internal reset script: " + str(e))
+                    print("[ERROR] Failed to run external reset script: " + str(e))
                     return
                 
         self._ensure_executable_running()
@@ -345,22 +360,44 @@ class GenerateGraph:
         if self.process is None:
             self.executable_thread = threading.Thread(target=self._start_executable)
             self.executable_thread.start()
-            time.sleep(self.delay)
+            time.sleep(self.executable_delay)
+
+    def _copy_executable(self):
+        # Check if the temp directory exists, if not, create it
+        if not os.path.exists(self.full_temp_dir):
+            os.makedirs(self.full_temp_dir)
+        # Remove all files and subdirectories in the temp directory
+        else:
+            shutil.rmtree(self.full_temp_dir)
+            os.makedirs(self.full_temp_dir)
+
+        # Get the directory of the original executable
+        exe_dir = os.path.dirname(self.original_executable)
+        # Copy all files and subdirectories from exe_dir to temp_dir
+        for item in os.listdir(exe_dir):
+            s = os.path.join(exe_dir, item)
+            d = os.path.join(self.full_temp_dir, item)
+            if os.path.isdir(s):
+                shutil.copytree(s, d)
+            else:
+                shutil.copy2(s, d)
+        self.selected_executable = os.path.join(self.full_temp_dir, os.path.basename(self.original_executable))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a graph using SikuliX and a specified executable.")
     parser.add_argument("--images_dir", required=True, help="Path to the directory containing images.")
     parser.add_argument("--practical_graph_file", required=True, help="Name of the practical graph file to save.")
     parser.add_argument("--selected_executable", required=True, help="Path to the executable to run.")
-    parser.add_argument("--delay", type=int, default=5, help="Delay in seconds between actions.")
+    parser.add_argument("--executable_delay", type=int, default=5, help="Delay in seconds after launched executable.")
+    parser.add_argument("--transition_delay", type=int, default=1, help="Delay in seconds between actions.")
     parser.add_argument("--debug_images", action="store_true", help="Enable debug images.")
     parser.add_argument("--timeout", type=int, default=2, help="Timeout in seconds for image matching.")
     parser.add_argument("--initial_similarity", type=float, default=0.99, help="Initial similarity for image matching.")
     parser.add_argument("--min_similarity", type=float, default=0.85, help="Minimum similarity for image matching.")
     parser.add_argument("--similarity_step", type=float, default=0.01, help="Similarity step for image matching.")
     parser.add_argument("--retries", type=int, default=8, help="Number of retries for image matching.")
-    parser.add_argument("--state_reset_method", type=str, default=StateResetMethod.RELAUNCH, choices=[StateResetMethod.RELAUNCH, StateResetMethod.INTERNAL_RESET], help="State reset method to use.")
-    parser.add_argument("--internal_reset_script", type=str, help="Path to the internal reset script to run. Only used if state_reset_method is INTERNAL_RESET.")
+    parser.add_argument("--state_reset_method", type=str, default=StateResetMethod.NONE, choices=[StateResetMethod.NONE, StateResetMethod.COPY_RESET, StateResetMethod.EXTERNAL_RESET], help="State reset method to use.")
+    parser.add_argument("--external_reset_script", type=str, help="Path to the external reset script to run. Only used if state_reset_method is EXTERNAL_RESET.")
 
     args = parser.parse_args()
 
@@ -368,7 +405,8 @@ if __name__ == "__main__":
         images_dir=args.images_dir, 
         practical_graph_file=args.practical_graph_file, 
         selected_executable=args.selected_executable,
-        delay=args.delay,
+        executable_delay=args.executable_delay,
+        transition_delay=args.transition_delay,
         debug_images=args.debug_images,
         timeout=args.timeout,
         initial_similarity=args.initial_similarity,
@@ -376,6 +414,6 @@ if __name__ == "__main__":
         similarity_step=args.similarity_step,
         retries=args.retries,
         state_reset_method=args.state_reset_method,
-        internal_reset_script=args.internal_reset_script
+        external_reset_script=args.external_reset_script
     )
     generator.generate_graph()

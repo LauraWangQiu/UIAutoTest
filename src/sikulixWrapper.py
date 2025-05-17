@@ -50,7 +50,8 @@ class SikulixWrapper:
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
                 self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
-                self.capture_error(debug_image_name, debug_image_path, capture_last_match)
+                if self.debug_images:
+                    self.capture_error(debug_image_name, debug_image_path, capture_last_match)
                 print("[OK] Image found.")
                 return True
             else:
@@ -187,10 +188,10 @@ class SikulixWrapper:
                 filepath = self.screen.capture(reg).save(folder, filename)
             else:
                 filepath = self.screen.capture().save(folder, filename)
-            print("[CAPTURE] Saved screenshot: " + filepath)
+            print("[CAPTURE] Saved screenshot: " + str(filepath))
             return filepath
         except Exception as e:
-            print("[ERROR] Failed to save screenshot:" + str(e))
+            print("[ERROR] Failed to save screenshot: " + str(e))
             return None
     
     

@@ -70,7 +70,12 @@ The variables in `config.json` are the following:
 - `initial_similarity`: the initial similarity value (from 0 to 1) used to start searching for images on the screen with Sikulix. A value of 1 means an exact match is required; 0 means no similarity is required.
 - `min_similarity`: The minimum similarity value (from 0 to 1) allowed when searching for images on the screen with Sikulix. If no image is found with the initial similarity, the search will continue decreasing the similarity down to this minimum value.
 - `similarity_step`: The amount by which the similarity value is decreased in each step when searching for images on the screen. The search starts at `initial_similarity` and decreases by this value until reaching `min_similarity`.
-- `state_reset_method`: "relaunch" or "interal_reset",
-- `internal_reset_script`: Script that should be run to reset the state of the executable when iterating and needs to rerun to continue generating the graph.
+- `retries`: The number of retries to check images.
+- `state_reset_method`: It can be any of the following:
+  - "none": No action taken when restarting executable
+  - "copy_reset": Copy the original executable and surrounding files to a temporary directory to make generate the graph each time it relaunches.
+  - "external_reset": Executes an user's script that should ensure the resetting of the executable (e.g. removing saved files by the executable).
+- `external_reset_script`: Script that should be run to reset the state of the executable when iterating and needs to rerun to continue generating the graph.
 - `tests_to_run`: Lists of tests to run, the names of the tests classes must be given and should be located in `tests_dir`, we provide the following tests: [`EdgePairCovTest`, `PrimePathCovTest`, `SelfLoopTest`, `TotalConnectTest`].
+- `pdf_file`: Name of the final report file in PDF, it is set to `report.pdf` by default.
 - `solution_file`: Name of the final report file, it is set to `solution.txt` by default.

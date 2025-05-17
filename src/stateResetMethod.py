@@ -1,7 +1,8 @@
 class StateResetMethod:
-    RELAUNCH = "relaunch"
-    INTERNAL_RESET = "internal_reset"
+    NONE = "none"
+    COPY_RESET = "copy_reset"
+    EXTERNAL_RESET = "external_reset"
 
     @classmethod
     def values(cls):
-        return [cls.RELAUNCH, cls.INTERNAL_RESET]
+        return [cls.NONE, cls.COPY_RESET, cls.EXTERNAL_RESET]

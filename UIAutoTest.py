@@ -47,18 +47,20 @@ if __name__ == "__main__":
     generate_graph =        config.get("generate_graph", True)
     selected_executable =   config.get("selected_executable", None)
     executable_delay =      config.get("executable_delay", "5")
+    transition_delay =       config.get("transition_delay", "2")
     debug_images =          config.get("debug_images", False)
     timeout =               config.get("timeout", 2)
     initial_similarity =    config.get("initial_similarity", 0.99)
     min_similarity =        config.get("min_similarity", 0.85)
     similarity_step =       config.get("similarity_step", 0.01)
     retries =               config.get("retries", 8)
-    state_reset_method =    config.get("state_reset_method", StateResetMethod.RELAUNCH)
+    state_reset_method =    config.get("state_reset_method", StateResetMethod.NONE)
     if state_reset_method not in StateResetMethod.values():
-        print(f"[ERROR] Invalid state reset method: {state_reset_method}. Setting to default 'relaunch'.")
-        state_reset_method = StateResetMethod.RELAUNCH
-    internal_reset_script = config.get("internal_reset_script", None)
+        print(f"[ERROR] Invalid state reset method: {state_reset_method}. Setting to default {StateResetMethod.NONE}.")
+        state_reset_method = StateResetMethod.NONE
+    external_reset_script = config.get("external_reset_script", None)
     tests_to_run =          config.get("tests_to_run", [])
+    pdf_file =              config.get("pdf_file", "report.pdf")
     solution_file =         config.get("solution_file", "solution.txt")
 
     headless = True if config_file else False
@@ -77,6 +79,7 @@ if __name__ == "__main__":
         generate_graph=generate_graph,
         selected_executable=selected_executable,
         executable_delay=executable_delay,
+        transition_delay=transition_delay,
         debug_images=debug_images,
         timeout=timeout,
         initial_similarity=initial_similarity,
@@ -84,8 +87,9 @@ if __name__ == "__main__":
         similarity_step=similarity_step,
         retries=retries,
         state_reset_method=state_reset_method,
-        internal_reset_script=internal_reset_script,
+        external_reset_script=external_reset_script,
         tests_to_run=tests_to_run,
         solution_file=solution_file,
+        pdf_file=pdf_file,
         headless=headless
     )

@@ -15,6 +15,7 @@ from PIL import Image, ImageTk
 from test import Test
 from graphsDef import Graph, Transition
 from actionTypes import ActionType
+from stateResetMethod import StateResetMethod
 import graphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
 import networkx as nx
@@ -41,6 +42,7 @@ class App(ctk.CTk):
                 generate_graph,
                 selected_executable,
                 executable_delay,
+                transition_delay,
                 debug_images,
                 timeout,
                 initial_similarity,
@@ -48,9 +50,10 @@ class App(ctk.CTk):
                 similarity_step,
                 retries,
                 state_reset_method,
-                internal_reset_script,
+                external_reset_script,
                 tests_to_run,
                 solution_file,
+                pdf_file,
                 headless=False):
         self.java_path = java_path                                      # Path to Java executable
         self.jython_jar = jython_jar                                    # Path to Jython jar file
@@ -70,6 +73,7 @@ class App(ctk.CTk):
         self.test_classes           = None                              # List of test classes        
         self.selected_executable    = selected_executable               # Selected executable path
         self.executable_delay       = executable_delay                  # Delay for the executable to start
+        self.transition_delay       = transition_delay                  # Delay for the transition to complete
         self.debug_images           = debug_images                      # Flag to show debug images when generating the graph
         self.timeout                = timeout                           # Timeout for SikuliX
         self.initial_similarity     = initial_similarity                # Initial similarity for SikuliX
@@ -77,12 +81,12 @@ class App(ctk.CTk):
         self.similarity_step        = similarity_step                   # Similarity step for SikuliX
         self.retries                = retries                           # Number of retries for SikuliX
         self.state_reset_method     = state_reset_method                # State reset method
-        self.internal_reset_script  = internal_reset_script             # Internal reset script
+        self.external_reset_script  = external_reset_script             # External reset script
         self.tests_to_run           = tests_to_run                      # List of tests to run
         self.solution_file          = solution_file                     # Test solution file
+        self.pdf_file               = pdf_file                          # PDF file for graph differences and tests results
         self.headless               = headless                          # Store the headless mode flag
 
-        self.graphDiff_PDF_route = "graphDiff.pdf"
         self.diff = {
             'missing_nodes_prac': set(),
             'missing_nodes_theo': set(),
@@ -103,7 +107,7 @@ class App(ctk.CTk):
                     time.sleep(0.1)
             self.run_tests()
             self.compare()
-            self.create_PDF(self.graphDiff_PDF_route)
+            self.create_PDF(self.pdf_file)
         else: 
             super().__init__()
             self.stop_event = threading.Event()
@@ -1096,16 +1100,16 @@ class App(ctk.CTk):
         theorical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
 
         # Entry to display the selected theorical graph file
-        self.selected_practical_graph_var = ctk.StringVar(value=self.theorical_graph_file)
-        self.selected_practical_graph_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.selected_practical_graph_var, state="readonly", font=ctk.CTkFont(size=12))
-        self.selected_practical_graph_entry.pack(fill="x", padx=10, pady=5)
+        self.theorical_graph_var = ctk.StringVar(value=self.theorical_graph_file)
+        self.theorical_graph_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.theorical_graph_var, state="readonly", font=ctk.CTkFont(size=12))
+        self.theorical_graph_entry.pack(fill="x", padx=10, pady=5)
 
-        select_practical_graph_button = ctk.CTkButton(
+        select_theorical_graph_button = ctk.CTkButton(
             scrollable_frame,
-            text="Select Practical Graph File",
-            command=self.select_practical_graph_file
+            text="Select Theorical Graph File",
+            command=self.select_theorical_graph_file
         )
-        select_practical_graph_button.pack(padx=10, pady=5, anchor="w")
+        select_theorical_graph_button.pack(padx=10, pady=5, anchor="w")
 
         # Run tests button
         run_button = ctk.CTkButton(scrollable_frame, text="Run Tests", command=self.run_tests)
@@ -1114,6 +1118,10 @@ class App(ctk.CTk):
         # Compare button
         compare_button = ctk.CTkButton(scrollable_frame, text="Compare Graphs", command=self.compare)
         compare_button.pack(fill="x", padx=10, pady=5)
+
+        # Button to Generate PDF
+        generate_pdf_button = ctk.CTkButton(scrollable_frame, text="Generate PDF", command=lambda: self.create_PDF(self.pdf_file))
+        generate_pdf_button.pack(fill="x", padx=10, pady=5)
 
     def select_tests_dir(self):
         directory_path = filedialog.askdirectory(
@@ -1172,8 +1180,8 @@ class App(ctk.CTk):
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
         )
         if file_path:
-            self.selected_practical_graph_file = file_path
-            self.selected_practical_graph_var.set(file_path)
+            self.practical_graph_file = file_path
+            self.practical_graph_var.set(file_path)
             print(f"[INFO] Practical graph file for tests set to: {file_path}")
 
     """
@@ -1239,7 +1247,8 @@ class App(ctk.CTk):
                     "--images_dir", self.images_dir,
                     "--practical_graph_file", self.practical_graph_file,
                     "--selected_executable", self.selected_executable,
-                    "--delay", str(self.executable_delay),
+                    "--executable_delay", str(self.executable_delay),
+                    "--transition_delay", str(self.transition_delay),
                 ]
                 if self.debug_images:
                     command.append("--debug_images")
@@ -1250,7 +1259,7 @@ class App(ctk.CTk):
                     "--similarity_step", str(self.similarity_step),
                     "--retries", str(self.retries),
                     "--state_reset_method", str(self.state_reset_method),
-                    "--internal_reset_script", str(self.internal_reset_script),
+                    "--external_reset_script", str(self.external_reset_script),
                 ]
                 print("[INFO] Running Jython script: " + " ".join(command))
                 process = subprocess.Popen(
@@ -1312,26 +1321,25 @@ class App(ctk.CTk):
             with open(self.solution_file, "a") as f:
                 print("[INFO] Comparing generated graph with given graph...")
                 f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
-                differences_found += self.compare_aux(self.generated_graph, self.graph, f, "diff_in_gen")
+                differences_found += self.compare_aux(f, self.generated_graph, self.graph, self.theorical_graph_file)
                 print("[INFO] Comparing given graph with generated graph...")
                 f.write("[COMPARING GIVEN GRAPH vs GENERATED GRAPH]\n")
-                differences_found += self.compare_aux(self.graph, self.generated_graph, f, "diff_in_the")
+                differences_found += self.compare_aux(f, self.graph, self.generated_graph, self.practical_graph_file)
                 if differences_found == 0:
                     f.write("[NO DIFFERENCES FOUND]\n")
             print("[INFO] Comparison finished. No differences found." if differences_found == 0 else f"[INFO] Comparison finished. {differences_found} differences found.")
         except Exception as e:
             print(f"[ERROR] Exception during comparison: {e}")
 
-    def compare_aux(self, graph1:Graph, graph2:Graph, file_output, diff_to):
+    def compare_aux(self, file_output, graph1:Graph, graph2:Graph, graph_file:str):
         differences_found = 0
         for node1 in graph1.nodes:
             print("[INFO] Comparing node: " + node1.name)
             node2 = graph2.get_node_image(node1.image)
             if node2 is None: # Node is not in generated graph
                 print("[INFO] Node not found: " + node1.name)
-                file_output.write("[MISSING NODE] " + node1.name + " not in graph2\n")
-                # Saves the diffs to the PDF.
-                if diff_to == "diff_in_gen":
+                file_output.write("[MISSING NODE] " + node1.name + " not in " + graph_file + "\n")
+                if graph_file == self.theorical_graph_file:
                     self.diff['missing_nodes_theo'].add(node1.name)
                 else:
                     self.diff['missing_nodes_prac'].add(node1.name)
@@ -1351,8 +1359,7 @@ class App(ctk.CTk):
                             # Writes the objetive destination and the real destination
                             file_output.write("[MISMATCH TRANSITION] Supposed: " + node1.name + " -/-> " + trans1.destination.name + " Real: " + node1.name +" -> " + trans2.destination.name + "\n")
                             self.diff['mismatch_trans'].append((node1.name, trans1.destination.name, trans2.destination.name, f"{graph1.name} vs {graph2.name}"))   
-                            # Saves the diffs to the PDF.
-                            if diff_to == "diff_in_gen":
+                            if graph_file == self.theorical_graph_file:
                                 self.diff['missing_edges_the'].add((node1.name, trans1.destination.name))                         
                             else:
                                 self.diff['missing_edges_gen'].add((node1.name, trans1.destination.name))
@@ -1362,14 +1369,8 @@ class App(ctk.CTk):
                 if not found:
                     print("[INFO] Transition not found: " + trans1.image)
                     file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + " " + trans1.image + "\n")
-                    file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + "\n")
-                    # Saves the diffs to the PDF.
-                    if diff_to == "diff_in_gen":
-                        self.diff['missing_edges_the'].add((node1.name, trans1.destination.name))
-                    else:
-                        self.diff['missing_edges_gen'].add((node1.name, trans1.destination.name))
                     differences_found += 1
-            return differences_found
+        return differences_found
 
     # ==============================================================================================
     # SETTINGS TAB
@@ -1378,52 +1379,247 @@ class App(ctk.CTk):
         settings_tab = ctk.CTkFrame(self.tab_control)
         self.tab_control.add(settings_tab, text="Settings")
 
-        # Java Path
-        java_label = ctk.CTkLabel(settings_tab, text="Java Path:", font=ctk.CTkFont(size=12))
+        # --- SCROLLABLE AREA ---
+        canvas = ctk.CTkCanvas(settings_tab, borderwidth=0, highlightthickness=0)
+        scrollbar = ctk.CTkScrollbar(settings_tab, orientation="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        scrollable_frame = ctk.CTkFrame(canvas)
+        window_id = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def on_canvas_configure(event):
+            canvas.itemconfig(window_id, width=event.width)
+
+        scrollable_frame.bind("<Configure>", on_frame_configure)
+        canvas.bind("<Configure>", on_canvas_configure)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # --- END SCROLLABLE AREA ---
+
+        # Ahora pon los widgets dentro de scrollable_frame en vez de settings_tab:
+        java_label = ctk.CTkLabel(scrollable_frame, text="Java Path:", font=ctk.CTkFont(size=12))
         java_label.pack(anchor="w", padx=10, pady=(10, 2))
         self.java_path_var = ctk.StringVar(value=self.java_path if self.java_path else "java")
-        java_entry = ctk.CTkEntry(settings_tab, textvariable=self.java_path_var, width=400)
+        java_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.java_path_var, width=400)
         java_entry.pack(fill="x", padx=10, pady=2)
-        java_button = ctk.CTkButton(settings_tab, text="Select Java Executable", command=self.select_java_path)
+        java_button = ctk.CTkButton(scrollable_frame, text="Select Java Executable", command=self.select_java_path)
         java_button.pack(padx=10, pady=5, anchor="w")
 
-        # SikuliX Path
-        sikulix_label = ctk.CTkLabel(settings_tab, text="SikuliX API Jar Path:", font=ctk.CTkFont(size=12))
+        sikulix_label = ctk.CTkLabel(scrollable_frame, text="SikuliX API Jar Path:", font=ctk.CTkFont(size=12))
         sikulix_label.pack(anchor="w", padx=10, pady=(10, 2))
         self.sikulix_jar_var = ctk.StringVar(value=self.sikulix_jar)
-        sikulix_entry = ctk.CTkEntry(settings_tab, textvariable=self.sikulix_jar_var, width=400)
+        sikulix_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.sikulix_jar_var, width=400)
         sikulix_entry.pack(fill="x", padx=10, pady=2)
-        sikulix_button = ctk.CTkButton(settings_tab, text="Select SikuliX Jar", command=self.select_sikulix_jar)
+        sikulix_button = ctk.CTkButton(scrollable_frame, text="Select SikuliX Jar", command=self.select_sikulix_jar)
         sikulix_button.pack(padx=10, pady=5, anchor="w")
 
-        # Jython Path
-        jython_label = ctk.CTkLabel(settings_tab, text="Jython Jar Path:", font=ctk.CTkFont(size=12))
+        jython_label = ctk.CTkLabel(scrollable_frame, text="Jython Jar Path:", font=ctk.CTkFont(size=12))
         jython_label.pack(anchor="w", padx=10, pady=(10, 2))
         self.jython_jar_var = ctk.StringVar(value=self.jython_jar)
-        jython_entry = ctk.CTkEntry(settings_tab, textvariable=self.jython_jar_var, width=400)
+        jython_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.jython_jar_var, width=400)
         jython_entry.pack(fill="x", padx=10, pady=2)
-        jython_button = ctk.CTkButton(settings_tab, text="Select Jython Jar", command=self.select_jython_jar)
+        jython_button = ctk.CTkButton(scrollable_frame, text="Select Jython Jar", command=self.select_jython_jar)
         jython_button.pack(padx=10, pady=5, anchor="w")
 
-        # Name of the practical graph file to export
-        practical_graph_label = ctk.CTkLabel(settings_tab, text="Practical Graph File to Export:", font=ctk.CTkFont(size=12))
+        practical_graph_label = ctk.CTkLabel(scrollable_frame, text="Practical Graph File to Export:", font=ctk.CTkFont(size=12))
         practical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
-        self.export_practical_graph_var = ctk.StringVar(value=self.practical_graph_file if self.practical_graph_file else "")
-        self.export_practical_graph_entry = ctk.CTkEntry(settings_tab, textvariable=self.export_practical_graph_var, width=400)
+        self.export_practical_graph_var = ctk.StringVar(value=self.practical_graph_file)
+        self.export_practical_graph_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.export_practical_graph_var, width=400)
         self.export_practical_graph_entry.pack(fill="x", padx=10, pady=2)
         def on_export_practical_graph_change(*args):
-            self.export_practical_graph_file = self.export_practical_graph_var.get()
+            self.practical_graph_file = self.export_practical_graph_var.get()
         self.export_practical_graph_var.trace_add("write", lambda *args: on_export_practical_graph_change())
 
-        # Name of the solution file
-        solution_label = ctk.CTkLabel(settings_tab, text="Solution File:", font=ctk.CTkFont(size=12))
+        # Executable Delay
+        executable_delay_label = ctk.CTkLabel(scrollable_frame, text="Executable Delay (s):", font=ctk.CTkFont(size=12))
+        executable_delay_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.executable_delay_var = ctk.StringVar(value=str(self.executable_delay))
+        executable_delay_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.executable_delay_var, width=100)
+        executable_delay_entry.pack(fill="x", padx=10, pady=2)
+        def on_executable_delay_change(*args):
+            value = self.executable_delay_var.get()
+            if value.strip() == "":
+                return
+            try:
+                self.executable_delay = int(value)
+            except ValueError:
+                pass
+        self.executable_delay_var.trace_add("write", lambda *args: on_executable_delay_change())
+
+        # Transition Delay
+        transition_delay_label = ctk.CTkLabel(scrollable_frame, text="Transition Delay (s):", font=ctk.CTkFont(size=12))
+        transition_delay_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.transition_delay_var = ctk.StringVar(value=str(self.transition_delay))
+        transition_delay_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.transition_delay_var, width=100)
+        transition_delay_entry.pack(fill="x", padx=10, pady=2)
+        def on_transition_delay_change(*args):
+            value = self.transition_delay_var.get()
+            if value.strip() == "":
+                return
+            try:
+                self.transition_delay = int(value)
+            except ValueError:
+                pass
+        self.transition_delay_var.trace_add("write", lambda *args: on_transition_delay_change())
+
+        # Debug Images (checkbox)
+        self.debug_images_var = ctk.BooleanVar(value=self.debug_images)
+        debug_images_checkbox = ctk.CTkCheckBox(scrollable_frame, text="Enable Debug Images", variable=self.debug_images_var)
+        debug_images_checkbox.pack(anchor="w", padx=10, pady=(10, 2))
+        def on_debug_images_change(*args):
+            self.debug_images = self.debug_images_var.get()
+        self.debug_images_var.trace_add("write", lambda *args: on_debug_images_change())
+
+        # Timeout
+        timeout_label = ctk.CTkLabel(scrollable_frame, text="Timeout (s):", font=ctk.CTkFont(size=12))
+        timeout_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.timeout_var = ctk.StringVar(value=str(self.timeout))
+        timeout_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.timeout_var, width=100)
+        timeout_entry.pack(fill="x", padx=10, pady=2)
+        def on_timeout_change(*args):
+            value = self.timeout_var.get()
+            if value.strip() == "":
+                return
+            try:
+                self.timeout = int(value)
+            except ValueError:
+                pass
+        self.timeout_var.trace_add("write", lambda *args: on_timeout_change())
+
+        # Initial Similarity
+        initial_similarity_label = ctk.CTkLabel(scrollable_frame, text="Initial Similarity (0-1):", font=ctk.CTkFont(size=12))
+        initial_similarity_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.initial_similarity_var = ctk.StringVar(value=str(self.initial_similarity))
+        initial_similarity_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.initial_similarity_var, width=100)
+        initial_similarity_entry.pack(fill="x", padx=10, pady=2)
+        def on_initial_similarity_change(*args):
+            value = self.initial_similarity_var.get()
+            if value.strip() == "":
+                return
+            try:
+                val = float(value)
+                if 0 <= val <= 1:
+                    self.initial_similarity = val
+            except ValueError:
+                pass
+        self.initial_similarity_var.trace_add("write", lambda *args: on_initial_similarity_change())
+
+        # Min Similarity
+        min_similarity_label = ctk.CTkLabel(scrollable_frame, text="Min Similarity (0-1):", font=ctk.CTkFont(size=12))
+        min_similarity_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.min_similarity_var = ctk.StringVar(value=str(self.min_similarity))
+        min_similarity_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.min_similarity_var, width=100)
+        min_similarity_entry.pack(fill="x", padx=10, pady=2)
+        def on_min_similarity_change(*args):
+            value = self.min_similarity_var.get()
+            if value.strip() == "":
+                return
+            try:
+                val = float(value)
+                if 0 <= val <= 1:
+                    self.min_similarity = val
+            except ValueError:
+                pass
+        self.min_similarity_var.trace_add("write", lambda *args: on_min_similarity_change())
+
+        # Similarity Step
+        similarity_step_label = ctk.CTkLabel(scrollable_frame, text="Similarity Step (0-1):", font=ctk.CTkFont(size=12))
+        similarity_step_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.similarity_step_var = ctk.StringVar(value=str(self.similarity_step))
+        similarity_step_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.similarity_step_var, width=100)
+        similarity_step_entry.pack(fill="x", padx=10, pady=2)
+        def on_similarity_step_change(*args):
+            value = self.similarity_step_var.get()
+            if value.strip() == "":
+                return
+            try:
+                val = float(value)
+                if 0 <= val <= 1:
+                    self.similarity_step = val
+            except ValueError:
+                pass
+        self.similarity_step_var.trace_add("write", lambda *args: on_similarity_step_change())
+
+        # Retries
+        retries_label = ctk.CTkLabel(scrollable_frame, text="Retries:", font=ctk.CTkFont(size=12))
+        retries_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.retries_var = ctk.StringVar(value=str(self.retries))
+        retries_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.retries_var, width=100)
+        retries_entry.pack(fill="x", padx=10, pady=2)
+        def on_retries_change(*args):
+            value = self.retries_var.get()
+            if value.strip() == "":
+                return
+            try:
+                self.retries = int(value)
+            except ValueError:
+                pass
+        self.retries_var.trace_add("write", lambda *args: on_retries_change())
+
+        # Solution File
+        solution_label = ctk.CTkLabel(scrollable_frame, text="Solution File:", font=ctk.CTkFont(size=12))
         solution_label.pack(anchor="w", padx=10, pady=(10, 2))
-        self.solution_var = ctk.StringVar(value=self.solution_file if self.solution_file else "")
-        self.solution_entry = ctk.CTkEntry(settings_tab, textvariable=self.solution_var, width=400)
+        self.solution_var = ctk.StringVar(value=self.solution_file)
+        self.solution_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.solution_var, width=400)
         self.solution_entry.pack(fill="x", padx=10, pady=2)
         def on_solution_change(*args):
             self.solution_file = self.solution_var.get()
         self.solution_var.trace_add("write", lambda *args: on_solution_change())
+
+        # PDF Diff Export File Name
+        pdf_route_label = ctk.CTkLabel(scrollable_frame, text="PDF Output File:", font=ctk.CTkFont(size=12))
+        pdf_route_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.pdf_route_var = ctk.StringVar(value=self.pdf_file)
+        self.pdf_route_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.pdf_route_var, width=400)
+        self.pdf_route_entry.pack(fill="x", padx=10, pady=2)
+        def on_pdf_route_change(*args):
+            self.pdf_file = self.pdf_route_var.get()
+        self.pdf_route_var.trace_add("write", lambda *args: on_pdf_route_change())
+        
+        # State Reset Method
+        state_reset_label = ctk.CTkLabel(scrollable_frame, text="State Reset Method:", font=ctk.CTkFont(size=12))
+        state_reset_label.pack(anchor="w", padx=10, pady=(10, 2))
+        reset_methods = [v for k, v in vars(StateResetMethod).items() if isinstance(v, str) and not k.startswith("__")]
+        self.state_reset_method_var = ctk.StringVar(value=self.state_reset_method)
+        state_reset_menu = ctk.CTkOptionMenu(
+            scrollable_frame,
+            values=reset_methods,
+            variable=self.state_reset_method_var
+        )
+        state_reset_menu.pack(fill="x", padx=10, pady=2)
+
+        # Space to select the external reset script if the method is EXTERNAL_RESET
+        self.external_reset_script_var = ctk.StringVar(value=self.external_reset_script)
+        self.external_reset_script_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.external_reset_script_var, width=400)
+        def select_external_reset_script():
+            file_path = filedialog.askopenfilename(
+                title="Select External Reset Script",
+                filetypes=[("Executables", "*.exe;*.bat;*.sh;*.py"), ("All Files", "*.*")]
+            )
+            if file_path:
+                self.external_reset_script_var.set(file_path)
+                self.external_reset_script = file_path
+        self.external_reset_script_button = ctk.CTkButton(scrollable_frame, text="Select External Reset Script", command=select_external_reset_script)
+
+        def update_external_reset_visibility(*args):
+            self.state_reset_method = self.state_reset_method_var.get()
+            if self.state_reset_method == StateResetMethod.EXTERNAL_RESET:
+                self.external_reset_script_entry.pack(fill="x", padx=10, pady=2)
+                self.external_reset_script_button.pack(padx=10, pady=2, anchor="w")
+            else:
+                self.external_reset_script_entry.pack_forget()
+                self.external_reset_script_button.pack_forget()
+        self.state_reset_method_var.trace_add("write", update_external_reset_visibility)
+        self.external_reset_script_var.trace_add("write", lambda *args: setattr(self, "external_reset_script", self.external_reset_script_var.get()))
+        update_external_reset_visibility()
 
     def select_java_path(self):
         file_path = filedialog.askopenfilename(
@@ -1539,7 +1735,7 @@ class App(ctk.CTk):
             all_nodes.add(n2.name)
 
         G = nx.DiGraph()
-        # Set the colour of the nodes depending in where they are.
+        # Set the colour of the nodes depending in where they are
         for name in all_nodes:
             if name in self.diff['missing_nodes_prac']:
                 color = 'red'
@@ -1568,16 +1764,16 @@ class App(ctk.CTk):
         plt.figure(figsize = (12, 8))
         pos = nx.spring_layout(G)
 
-        # Draw the nodes.
+        # Draw the nodes
         node_colors = []
         for node in G.nodes():
             node_colors.append(G.nodes[node]['color'])
         nx.draw_networkx_nodes(G, pos, node_size = 1500, node_color = node_colors)
 
-        # Draw nodes names.
+        # Draw nodes names
         nx.draw_networkx_labels(G, pos, font_size = 9, font_color='white')
 
-        # Draw the transitions.
+        # Draw the transitions
         for u, v, attr in G.edges(data=True):
             nx.draw_networkx_edges(
                 G, pos,
@@ -1588,15 +1784,13 @@ class App(ctk.CTk):
                 width = 3
             )
 
-
         # Caption of the document
-        black_node = mpatches.Patch(color = 'black', label = 'In boths grphs')
-        red_node   = mpatches.Patch(color = 'red',   label = 'Not in generated graph.')
-        green_node = mpatches.Patch(color = 'green', label = 'Not in theorical graph.')
+        black_node = mpatches.Patch(color = 'black', label = 'In boths graphs')
+        red_node   = mpatches.Patch(color = 'red',   label = 'Not in generated graph')
+        green_node = mpatches.Patch(color = 'green', label = 'Not in theorical graph')
        
         caption = [black_node, red_node, green_node]
         plt.legend(handles = caption, loc = 'upper right', fontsize = 10, frameon = True, labelcolor = "orange")
-
 
         plt.axis('off')
         plt.tight_layout()
