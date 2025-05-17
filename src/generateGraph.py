@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import threading
 import time
+import re
 from sikulixWrapper import SikulixWrapper
 from graphsDef import Graph
 from actionTypes import ActionType
@@ -227,7 +228,7 @@ class GenerateGraph:
                             if self.debug_images:
                                 self.sikuli.capture_error(btn, self.full_debug_name)
 
-                            result, text = self._do_action(action_type, btn_path)
+                            result, text = self._do_action(action_type, btn_path,buttons_input_path_names)
                             if not result:
                                 print("[DFS] Could not " + str(action_type) + " on: " + str(btn_path))
                                 continue
@@ -240,6 +241,21 @@ class GenerateGraph:
                             transition.update_image(btn_path)
                             if action_type == ActionType.CLICK_AND_TYPE:
                                 transition.update_text(text)
+                            elif action_type == ActionType.DRAG_AND_DROP:  
+                                dir_path = os.path.dirname(btn_path)
+                                filename = os.path.basename(btn_path)
+                                name, ext = os.path.splitext(filename)
+                                match = re.search(r'(\d+)$', name)
+                                if match:
+                                    num = match.group(1)
+                                    if name.startswith("drag"):
+                                        drag_img = btn_path
+                                        drop_img = os.path.join(dir_path, "drop" + num + ext)
+                                    else:
+                                        drag_img = os.path.join(dir_path, "drag" + num + ext)
+                                        drop_img = btn_path
+                                    transition.update_drag_and_drop(drag_img, drop_img)
+
                             self._restart_executable_and_continue()
                             
         else:
@@ -263,7 +279,7 @@ class GenerateGraph:
         
         return current_state
 
-    def _do_action(self, action_type, btn_path, clear_before=False, enter=True):
+    def _do_action(self, action_type, btn_path,buttons_input_path_names ):
         if action_type is None or not ActionType.is_valid_action(action_type):
             print("[ERROR] No action type selected.")
             return False
@@ -275,8 +291,7 @@ class GenerateGraph:
             result = self.sikuli.click_image(btn_path, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step, capture_last_match=True, debug_image_name=os.path.basename(btn_path), debug_image_path=self.debug_name)
         elif action_type == ActionType.DOUBLE_CLICK:
             print("[INFO] Double clicking on: " + str(btn_path))
-            return False
-            # self.sikuli.double_click_image(btn_path, similarity=self.similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, capture_last_match = True)
+            result = self.sikuli.double_click_image(btn_path, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step, capture_last_match=True, debug_image_name=os.path.basename(btn_path), debug_image_path=self.debug_name)
         elif action_type == ActionType.CLICK_AND_TYPE:
             txt_path = os.path.splitext(btn_path)[0] + ".txt"
             if os.path.isfile(txt_path):
@@ -286,14 +301,45 @@ class GenerateGraph:
                 print("[ERROR] No .txt file found for click and type: " + str(txt_path))
                 return False
             print("[INFO] Clicking and typing on: " + str(btn_path) + " with text: " + str(text))
-            result = self.sikuli.write_text(btn_path, text=text, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step, clear_before=clear_before, enter=enter)
+            result = self.sikuli.write_text(btn_path, text=text, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step)
         elif action_type == ActionType.DRAG_AND_DROP:
-            btn1_path, btn2_path = btn_path
-            if btn1_path is None or btn2_path is None:
-                print("[ERROR] You need to specify both buttons for drag and drop.")
-                return False
-            print("[INFO] Dragging and dropping from: " + str(btn1_path) + " to: " + str(btn2_path))
-            result = self.sikuli.drag_and_drop(btn1_path, btn2_path, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step)
+            dir_path = os.path.dirname(btn_path)
+            filename  = os.path.basename(btn_path)
+            name,ext = os.path.splitext(filename)
+            match = re.search(r'(\d+)$', name)
+            if match:
+                num = match.group(1)
+                pair_prefix = "a"
+                if name.startswith("drag"):
+                    pair_prefix = "drop"
+                elif name.startswith("drop"):
+                    pair_prefix = "drag"
+                else:
+                    print("[ERROR] Invalid drag and drop image name: " + str(btn_path))
+                    return False
+                pair_name = pair_prefix + num + ext
+                pair_path = os.path.join(dir_path, pair_name)
+                if os.path.isfile(pair_path):
+                    if name.startswith("drag"):
+                        drag_img = btn_path
+                        drop_img = pair_path
+                    else:
+                        drag_img = pair_path
+                        drop_img = btn_path
+                    print("[INFO] Dragging and dropping: " + str(drag_img) + " on: " + str(drop_img))
+                    result = self.sikuli.drag_and_drop(drag_img, drop_img, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step)
+                    if pair_name in buttons_input_path_names:
+                        buttons_input_path_names.remove(pair_name)
+                    return result, pair_name
+                else:
+                    print("[ERROR] No pair image found for drag and drop: " + str(pair_path))
+                    if pair_name in buttons_input_path_names:
+                        buttons_input_path_names.remove(pair_name)
+                    return False,None
+                
+            print("[ERROR] Could not extract number from drag/drop image name: " + filename)
+            return False, None
+                
 
         # Add delay time after each action
         time.sleep(self.transition_delay)
@@ -344,7 +390,7 @@ class GenerateGraph:
         for idx, action in enumerate(action_list):
             for btn in action_dict[action]:
                 print("[SEQUENCE] " + str(btn))
-                result, text = self._do_action(action, btn)
+                result, text = self._do_action(action, btn,action_dict[action])
                 if not result:
                     print("[ERROR] Failed to navigate to state: " + str(btn))
                     break

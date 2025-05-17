@@ -107,6 +107,34 @@ class SikulixWrapper:
         return False
     
     """
+        Attempt to locate and double-click the given image on screen.
+
+        :param image_path: Path to the image file to click.
+        :param similarity: Starting similarity threshold (0.0–1.0).
+        :param timeout: How many seconds to wait on each try.
+        :param retries: Number of attempts before giving up.
+        :param similarity_reduction: Amount to reduce similarity per attempt.
+        :return: True if the click was successful; False otherwise.
+    """
+    def double_click_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, debug_image_name="debug_image", debug_image_path=".", capture_last_match=False):
+        print("[INFO] Trying double click on image: " + image_path)
+        for attempt in range(retries):
+            actual_attempt = attempt + 1
+            actual_similarity = similarity - (similarity_reduction * attempt)
+            print("Attempts " + str(actual_attempt) + "/" + str(retries))
+            match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
+            if match:
+                self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
+                if capture_last_match:
+                    self.capture_error(debug_image_name, debug_image_path, capture_last_match)
+                self.screen.doubleClick(Pattern(image_path).similar(actual_similarity))
+                print("[OK] Double clicked image.")
+                return True
+            else:
+                print("[WARNING] Not found. Trying again...")
+
+        return False
+    """
         Clicks on an image (e.g., input field) and types text into it.
 
         :param image_path: Path to the image of the target input field.
