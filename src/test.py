@@ -6,6 +6,7 @@ class Test:
         self.name = name
         self.graph = graph
         self.graph_file = graph_file
+        self._update_callback = None
         print(f"Initializing {self.name} class.")
 
     """

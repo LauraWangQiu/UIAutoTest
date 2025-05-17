@@ -4,7 +4,6 @@ class PrimePathCovTest(Test):
     def __init__(self, graph=None, graph_file=None):
         super().__init__("PPC Test", graph, graph_file)
         self.prime_paths = set()
-        self._update_callback = None
 
     """
         Overrides the parent run method

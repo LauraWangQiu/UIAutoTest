@@ -5,7 +5,6 @@ class TotalConnectTest(Test):
         super().__init__("TC Test", graph, graph_file)
         self.visited_states = set()
         self.visited_transitions = set()
-        self._update_callback = None
 
     """
         Overrides the parent run method

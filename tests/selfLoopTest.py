@@ -4,7 +4,6 @@ class SelfLoopTest(Test):
     def __init__(self, graph=None, graph_file=None):
         super().__init__("SP Test", graph, graph_file)
         self.selfLoopList = set()
-        self._update_callback = None
 
     """
         Overrides the parent run method
@@ -20,8 +19,6 @@ class SelfLoopTest(Test):
                     print("SelfLoop in node: " + node.name)
                     self.selfLoopList.add(node)
                     break
-                else:
-                    print("Not SelfLoop")
 
         content = "\n".join(node.name for node in self.selfLoopList)
         self.notify_update("selfLoopList", content)

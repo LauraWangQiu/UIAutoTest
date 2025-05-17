@@ -4,7 +4,6 @@ class EdgePairCovTest(Test):
     def __init__(self, graph=None, graph_file=None):
         super().__init__("EPC Test", graph, graph_file)
         self.edgePairCovList = set()   # Dictionary of duplicated edges
-        self._update_callback = None
 
     """
         Overrides the parent run method
