@@ -11,6 +11,8 @@ from graphsDef import Graph, Transition
 from actionTypes import ActionType
 import GraphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
+import shutil
+import tempfile
 
 class GenerateGraph:
     valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp'}
@@ -43,6 +45,8 @@ class GenerateGraph:
         self.min_similarity = min_similarity
         self.similarity_step = similarity_step
         self.timeout = timeout
+        self._temp_build_dir = None
+        self._temp_executable_path = None
         
     def generate_graph(self):
         print("[INFO] Generating graph for " + str(self.selected_executable))
@@ -71,17 +75,54 @@ class GenerateGraph:
 
     def _start_executable(self):
         try:
-            print("[INFO] Starting executable: " + str(self.selected_executable))
-            self.process = subprocess.Popen([self.selected_executable])
+            print("[DEBUG] Starting _start_executable method")
+            # 1. Identify the original build folder
+            original_executable = os.path.abspath(self.selected_executable)
+            print("[DEBUG] original_executable: " + str(original_executable))
+            build_dir = os.path.dirname(original_executable)
+            print("[DEBUG] build_dir: " + str(build_dir))
+
+            # 2. Create a temporary folder
+            
+            parent_dir = os.path.dirname(build_dir)
+            tmp_dir = os.path.join(parent_dir, "tmp")
+            print("[DEBUG] Temporary build directory path: " + str(tmp_dir))
+            # If tmp already exists, remove it to start fresh
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir)
+                print("[DEBUG] Existing tmp directory removed.")
+            os.makedirs(tmp_dir)
+            print("[DEBUG] Temporary build directory created: " + str(tmp_dir))
+            self._temp_build_dir = tmp_dir
+            # 3. Copy ALL build content to the temporary folder
+            for item in os.listdir(build_dir):
+                s = os.path.join(build_dir, item)
+                d = os.path.join(self._temp_build_dir, item)
+                print("[DEBUG] Copying item: " + str(s) + " to " + str(d))
+                if os.path.isdir(s):
+                    shutil.copytree(s, d)
+                    print("[DEBUG] Directory copied: " + str(s))
+                else:
+                    shutil.copy2(s, d)
+                    print("[DEBUG] File copied: " + str(s))
+
+            # 4. Adjust the executable path to the temporary copy
+            self._temp_executable_path = os.path.join(self._temp_build_dir, os.path.basename(original_executable))
+            print("[INFO] Starting executable (temporal copy): " + self._temp_executable_path)
+            self.process = subprocess.Popen([self._temp_executable_path])
+            print("[DEBUG] Executable process started: " + str(self.process))
             self.process.wait()
+            print("[DEBUG] Executable process finished")
         except FileNotFoundError:
-            print("[INFO] Executable not found: " + str(self.selected_executable))
+            print("[INFO] Executable not found (temp copy): " + str(self._temp_executable_path))
             self.process = None
+        except Exception as e:
+            print("[ERROR] Exception in _start_executable: " + str(e))
 
     def _stop_executable(self):
         try:
             if self.process is not None:
-                print("[INFO] Stopping executable: " + str(self.selected_executable))
+                print("[INFO] Stopping executable: " + str(self._temp_executable_path))
                 self.process.terminate()
                 try:
                     self.process.wait(timeout=5)
@@ -98,6 +139,12 @@ class GenerateGraph:
         except Exception as e:
             print("[ERROR] Error on closing executable: "+str(e))
             self.process = None
+        # --- Borra la carpeta temporal (limpia todo) ---
+        if self._temp_build_dir and os.path.exists(self._temp_build_dir):
+            shutil.rmtree(self._temp_build_dir)
+            print("[INFO] Temp build directory deleted:"+ self._temp_build_dir)
+            self._temp_build_dir = None
+
 
     # --- DFS recursivo ---
     def _loop(self):
