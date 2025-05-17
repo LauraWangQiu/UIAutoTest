@@ -17,6 +17,9 @@ from graphsDef import Graph, Transition
 from actionTypes import ActionType
 import graphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
+import networkx as nx
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 class App(ctk.CTk):
     """
@@ -79,6 +82,14 @@ class App(ctk.CTk):
         self.solution_file          = solution_file                     # Test solution file
         self.headless               = headless                          # Store the headless mode flag
 
+        self.graphDiff_PDF_route = "graphDiff.pdf"
+        self.diff = {
+            'missing_nodes_prac': set(),
+            'missing_nodes_theo': set(),
+            'missing_edges_gen': set(),
+            'missing_edges_the': set(),
+        }
+        
         self.test_checkboxes = {}
         self.test_output_widgets = {}
 
@@ -92,6 +103,7 @@ class App(ctk.CTk):
                     time.sleep(0.1)
             self.run_tests()
             self.compare()
+            self.create_PDF(self.graphDiff_PDF_route)
         else: 
             super().__init__()
             self.stop_event = threading.Event()
@@ -1300,17 +1312,17 @@ class App(ctk.CTk):
             with open(self.solution_file, "a") as f:
                 print("[INFO] Comparing generated graph with given graph...")
                 f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
-                differences_found += self.compare_aux(self.generated_graph, self.graph, f)
+                differences_found += self.compare_aux(self.generated_graph, self.graph, f, "diff_in_gen")
                 print("[INFO] Comparing given graph with generated graph...")
                 f.write("[COMPARING GIVEN GRAPH vs GENERATED GRAPH]\n")
-                differences_found += self.compare_aux(self.graph, self.generated_graph, f)
+                differences_found += self.compare_aux(self.graph, self.generated_graph, f, "diff_in_the")
                 if differences_found == 0:
                     f.write("[NO DIFFERENCES FOUND]\n")
             print("[INFO] Comparison finished. No differences found." if differences_found == 0 else f"[INFO] Comparison finished. {differences_found} differences found.")
         except Exception as e:
             print(f"[ERROR] Exception during comparison: {e}")
 
-    def compare_aux(self, graph1:Graph, graph2:Graph, file_output):
+    def compare_aux(self, graph1:Graph, graph2:Graph, file_output, diff_to):
         differences_found = 0
         for node1 in graph1.nodes:
             print("[INFO] Comparing node: " + node1.name)
@@ -1318,6 +1330,11 @@ class App(ctk.CTk):
             if node2 is None: # Node is not in generated graph
                 print("[INFO] Node not found: " + node1.name)
                 file_output.write("[MISSING NODE] " + node1.name + " not in graph2\n")
+                # Saves the diffs to the PDF.
+                if diff_to == "diff_in_gen":
+                    self.diff['missing_nodes_theo'].add(node1.name)
+                else:
+                    self.diff['missing_nodes_prac'].add(node1.name)
                 differences_found += 1
                 continue
 
@@ -1333,14 +1350,26 @@ class App(ctk.CTk):
                             print("[INFO] Transition mismatch: " + trans1.image)
                             # Writes the objetive destination and the real destination
                             file_output.write("[MISMATCH TRANSITION] Supposed: " + node1.name + " -/-> " + trans1.destination.name + " Real: " + node1.name +" -> " + trans2.destination.name + "\n")
+                            self.diff['mismatch_trans'].append((node1.name, trans1.destination.name, trans2.destination.name, f"{graph1.name} vs {graph2.name}"))   
+                            # Saves the diffs to the PDF.
+                            if diff_to == "diff_in_gen":
+                                self.diff['missing_edges_the'].add((node1.name, trans1.destination.name))                         
+                            else:
+                                self.diff['missing_edges_gen'].add((node1.name, trans1.destination.name))
                             differences_found += 1
                         found = True
                         continue
                 if not found:
                     print("[INFO] Transition not found: " + trans1.image)
                     file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + " " + trans1.image + "\n")
+                    file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + "\n")
+                    # Saves the diffs to the PDF.
+                    if diff_to == "diff_in_gen":
+                        self.diff['missing_edges_the'].add((node1.name, trans1.destination.name))
+                    else:
+                        self.diff['missing_edges_gen'].add((node1.name, trans1.destination.name))
                     differences_found += 1
-        return differences_found
+            return differences_found
 
     # ==============================================================================================
     # SETTINGS TAB
@@ -1498,3 +1527,83 @@ class App(ctk.CTk):
         """
         def flush(self):
             pass
+       
+    """
+        Creates a PDF with the diff graph after the comparison.
+    """ 
+    def create_PDF(self, output_pdf_path: str):
+        all_nodes = set()
+        for n in self.graph.nodes:
+            all_nodes.add(n.name)
+        for n2 in self.generated_graph.nodes:
+            all_nodes.add(n2.name)
+
+        G = nx.DiGraph()
+        # Set the colour of the nodes depending in where they are.
+        for name in all_nodes:
+            if name in self.diff['missing_nodes_prac']:
+                color = 'red'
+            elif name in self.diff['missing_nodes_theo']:
+                color = 'green'
+            else:
+                color = 'black'
+            G.add_node(name, color = color)
+        
+        # Set the transitions missing in generated graph in green
+        for n in self.graph.nodes:
+            for t in n.transitions:
+                u = n.name
+                v = t.destination.name
+                if (u, v) in self.diff['missing_edges_gen']:
+                    edge_color = 'red'
+                    style = 'solid'
+                else:
+                    edge_color = 'black'
+                    style = 'solid'
+                G.add_edge(u, v, color = edge_color, style=style)
+        # Set the transitions missing in theorical graph in green
+        for (u, v) in self.diff['missing_edges_the']:
+            G.add_edge(u, v, color = 'green', style = 'solid')
+
+        plt.figure(figsize = (12, 8))
+        pos = nx.spring_layout(G)
+
+        # Draw the nodes.
+        node_colors = []
+        for node in G.nodes():
+            node_colors.append(G.nodes[node]['color'])
+        nx.draw_networkx_nodes(G, pos, node_size = 1500, node_color = node_colors)
+
+        # Draw nodes names.
+        nx.draw_networkx_labels(G, pos, font_size = 9, font_color='white')
+
+        # Draw the transitions.
+        for u, v, attr in G.edges(data=True):
+            nx.draw_networkx_edges(
+                G, pos,
+                edgelist = [(u, v)],
+                style=attr['style'],
+                edge_color = attr['color'],
+                arrowsize = 30,
+                width = 3
+            )
+
+
+        # Caption of the document
+        black_node = mpatches.Patch(color = 'black', label = 'In boths grphs')
+        red_node   = mpatches.Patch(color = 'red',   label = 'Not in generated graph.')
+        green_node = mpatches.Patch(color = 'green', label = 'Not in theorical graph.')
+       
+        caption = [black_node, red_node, green_node]
+        plt.legend(handles = caption, loc = 'upper right', fontsize = 10, frameon = True, labelcolor = "orange")
+
+
+        plt.axis('off')
+        plt.tight_layout()
+        try:
+            plt.savefig(output_pdf_path, format = 'pdf', bbox_inches = 'tight')
+            print(f"[INFO] DiffGraph PDF done in: {output_pdf_path}")
+        except Exception as e:
+            print(f"[ERROR] Erro while doing the PDF: {e}")
+        finally:
+            plt.close()
