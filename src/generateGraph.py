@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 import argparse
 import os
-import shutil
 import subprocess
 import threading
 import time
 from sikulixWrapper import SikulixWrapper
-from graphsDef import Graph, Transition
+from graphsDef import Graph
 from actionTypes import ActionType
 from stateResetMethod import StateResetMethod
 import graphIO as _graph_io_module
@@ -15,7 +14,7 @@ GraphIO = _graph_io_module.GraphIO
 class GenerateGraph:
     valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp'}
 
-    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5, timeout=2, initial_similarity=0.99, min_similarity=0.85, similarity_step=0.01, state_reset_method=StateResetMethod.RELAUNCH):
+    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5, debug_images=False, timeout=2, initial_similarity=0.99, min_similarity=0.85, similarity_step=0.01, retries=8, state_reset_method=StateResetMethod.RELAUNCH, internal_reset_script=None):
         self.graph_io = GraphIO()  
         self.sikuli = SikulixWrapper()
 
@@ -23,19 +22,23 @@ class GenerateGraph:
         self.practical_graph_file = practical_graph_file
         self.selected_executable = selected_executable
         self.delay = delay
+        self.debug_images = debug_images
+        self.timeout = timeout
         self.initial_similarity = initial_similarity
         self.min_similarity = min_similarity
         self.similarity_step = similarity_step
-        self.timeout = timeout
+        self.retries = retries
         self.state_reset_method = state_reset_method
+        self.internal_reset_script = internal_reset_script
 
         self.graph = None
         self.visited_states = set()
-        self.lastInput = None
+        self.lastInputs = []
         self.inputs = {
             value: [] for name, value in vars(ActionType).items()
             if not name.startswith("__") and not callable(value)
         }
+        self.similarity = 1
 
         self.stop_loop = threading.Event()
         self.process = None
@@ -51,6 +54,26 @@ class GenerateGraph:
         self.phantom_state_counter = 0
         
     def generate_graph(self):
+        # Check if internal reset script is provided when the state reset method is INTERNAL_RESET
+        if self.state_reset_method == StateResetMethod.INTERNAL_RESET:
+            if not self.internal_reset_script:
+                print("[ERROR] Internal reset script not provided.")
+                return
+        
+        # Check if the images directory exists and is a directory
+        if not os.path.isdir(self.full_images_dir):
+            print("[LOOP] Images directory does not exist or is not a directory: " + self.full_images_dir)
+            return
+        
+        # Check if state folders exist
+        state_folders = [os.path.join(self.full_images_dir, d) for d in os.listdir(self.full_images_dir) if os.path.isdir(os.path.join(self.full_images_dir, d))]
+        if not state_folders:
+            print("[LOOP] No states found.")
+            return
+        
+        if self.debug_images and not os.path.exists(self.full_debug_name):
+            os.makedirs(self.full_debug_name)
+        
         print("[INFO] Generating graph for " + str(self.selected_executable))
         self.executable_thread = threading.Thread()
         self.executable_thread.start()
@@ -109,16 +132,6 @@ class GenerateGraph:
             self.process = None
 
     def _loop(self):
-        # Check if the images directory exists and is a directory
-        if not os.path.isdir(self.full_images_dir):
-            print("[LOOP] Images directory does not exist or is not a directory: " + self.full_images_dir)
-            return
-        state_folders = [os.path.join(self.full_images_dir, d) for d in os.listdir(self.full_images_dir) if os.path.isdir(os.path.join(self.full_images_dir, d))]
-        if not state_folders:
-            print("[LOOP] No states found.")
-            return
-        if not os.path.exists(self.full_debug_name):
-            os.makedirs(self.full_debug_name)
         print("[LOOP] Starting DFS graph generation loop...")
         self._ensure_executable_running()
         self.graph = Graph()
@@ -159,9 +172,11 @@ class GenerateGraph:
                     break
                     
             similarity -= self.similarity_step
-
+        
         if current_state is not None:
-            self.sikuli.capture_error(current_state_name, self.full_debug_name)
+            if self.debug_images:
+                self.sikuli.capture_error(current_state_name, self.full_debug_name)
+
             if current_state not in self.visited_states:
                 print("[DFS] Visiting state: " + str(current_state.name))
                 self.visited_states.add(current_state)
@@ -204,15 +219,16 @@ class GenerateGraph:
                                 print("[DFS] Skipping non-image file: " + str(btn_path))
                                 continue
                             print("[DFS] Simulating " + action_type + " with button image: " + str(btn_path))
-                            self.lastInput = action_type
-                            self.sikuli.capture_error(btn, self.full_debug_name)
-                            text = None
-                            result,text = self.do_action(action_type, btn_path,text)
+                            self.lastInputs.append(action_type)
+
+                            if self.debug_images:
+                                self.sikuli.capture_error(btn, self.full_debug_name)
+
+                            result, text = self._do_action(action_type, btn_path)
                             if not result:
-                                print("[DFS] Could not " + self.lastInput + " on: " + str(btn_path))
+                                print("[DFS] Could not " + str(action_type) + " on: " + str(btn_path))
                                 continue
                                                   
-                            time.sleep(self.delay)
                             self._add_inputs_to_path(btn_path)
                             dst_node = self._dfs_state()
                             print("[DFS] Creating transition from node: " + str(current_state_name) + " with image: " + str(btn_path))
@@ -223,8 +239,6 @@ class GenerateGraph:
                                 transition.update_text(text)
                             self._restart_executable_and_continue()
                             
-            
-
         else:
             print("[DFS] Current state not found")
             phantom_node_name = self.default_state_name + str(self.phantom_state_counter)
@@ -232,9 +246,10 @@ class GenerateGraph:
             if not os.path.exists(phantom_dir):
                 os.makedirs(phantom_dir)
 
-            # Screenshot and save
-            file_path = self.sikuli.capture_error(phantom_node_name, phantom_dir)
-            print("[DFS] Screenshot saved at: " + phantom_dir)
+            if self.debug_images:
+                # Screenshot and save
+                file_path = self.sikuli.capture_error(phantom_node_name, phantom_dir)
+                print("[DFS] Screenshot saved at: " + phantom_dir)
 
             # Add the phantom node to the graph
             current_state = self.graph.add_node_with_image(phantom_node_name, file_path)
@@ -245,19 +260,20 @@ class GenerateGraph:
         
         return current_state
 
-    def do_action(self, action_type, btn_path, text=str, btn2_path=None, similarity=1.0, timeout=0.01, retries=8, similarity_reduction=0.1, clear_before=False,enter=True):
+    def _do_action(self, action_type, btn_path, clear_before=False, enter=True):
         if action_type is None or not ActionType.is_valid_action(action_type):
             print("[ERROR] No action type selected.")
             return False
 
         result = False
+        text = None
         if action_type == ActionType.CLICK:
             print("[INFO] Clicking on: " + str(btn_path))
-            result = self.sikuli.click_image(btn_path, similarity = similarity, timeout = timeout, retries = retries, similarity_reduction = similarity_reduction, capture_last_match = True, debug_image_name = os.path.basename(btn_path), debug_image_path = self.debug_name)
+            result = self.sikuli.click_image(btn_path, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step, capture_last_match=True, debug_image_name=os.path.basename(btn_path), debug_image_path=self.debug_name)
         elif action_type == ActionType.DOUBLE_CLICK:
             print("[INFO] Double clicking on: " + str(btn_path))
             return False
-            # self.sikuli.double_click_image(btn_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, capture_last_match = True)
+            # self.sikuli.double_click_image(btn_path, similarity=self.similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, capture_last_match = True)
         elif action_type == ActionType.CLICK_AND_TYPE:
             txt_path = os.path.splitext(btn_path)[0] + ".txt"
             if os.path.isfile(txt_path):
@@ -267,45 +283,62 @@ class GenerateGraph:
                 print("[ERROR] No .txt file found for click and type: " + str(txt_path))
                 return False
             print("[INFO] Clicking and typing on: " + str(btn_path) + " with text: " + str(text))
-            result = self.sikuli.write_text(btn_path, text=text, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, clear_before=clear_before,enter=enter)
+            result = self.sikuli.write_text(btn_path, text=text, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step, clear_before=clear_before, enter=enter)
         elif action_type == ActionType.DRAG_AND_DROP:
-            if btn2_path is None:
-                print("[ERROR] No second button path provided for drag and drop.")
+            btn1_path, btn2_path = btn_path
+            if btn1_path is None or btn2_path is None:
+                print("[ERROR] You need to specify both buttons for drag and drop.")
                 return False
-            print("[INFO] Dragging and dropping from: " + str(btn_path) + " to: " + str(btn2_path))
-            result = self.sikuli.drag_and_drop(btn_path, btn2_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction)
+            print("[INFO] Dragging and dropping from: " + str(btn1_path) + " to: " + str(btn2_path))
+            result = self.sikuli.drag_and_drop(btn1_path, btn2_path, similarity=self.similarity, timeout=self.timeout, retries=self.retries, similarity_reduction=self.similarity_step)
 
-        return result,text
+        # Add delay time after each action
+        time.sleep(self.delay)
+        return result, text
 
     def _restart_executable_and_continue(self):
-        print("[RESTART] Restarting executable...")
         self._stop_executable()
-        print("Before if's" , self.inputs)
-        
-        print("Self last input" , self.lastInput)
-        if not self.lastInput or not self.inputs.get(self.lastInput):
+        if not self.lastInputs:
+            print("[INFO] No last inputs to pop.")
             return
-        if self.inputs[self.lastInput]:
-            print("Before pop ", self.inputs)
-            self.inputs[self.lastInput].pop()
-            print("After pop", self.inputs)
-            
-        else: 
+        last_key = self.lastInputs[-1]
+        if last_key not in self.inputs:
+            print("[ERROR] Last input not found in inputs: " + str(last_key))
             return
+        if self.inputs[last_key]:
+            print("[INFO] Popping last input: " + str(self.inputs[last_key][-1]))
+            self.inputs[last_key].pop()
+        print("[INFO] Popping last input: " + str(self.lastInputs[-1]))
+        self.lastInputs.pop()
         
+        # Check if the state reset method is set to relaunch, if so, run the user's internal reset script
+        if self.state_reset_method == StateResetMethod.INTERNAL_RESET:
+            if self.internal_reset_script:
+                print("[INFO] Running internal reset script: " + str(self.internal_reset_script))
+                try:
+                    subprocess.run([self.internal_reset_script], check=True)
+                except Exception as e:
+                    print("[ERROR] Failed to run internal reset script: " + str(e))
+                    return
+                
         self._ensure_executable_running()
-        self._navigate_to_state(self.inputs[self.lastInput])
+        if self.lastInputs:
+            print("[INFO] Last inputs found, navigating to state: " + str(self.inputs[self.lastInputs[-1]]))
+            self._navigate_to_state(self.inputs, self.lastInputs)
 
     def _add_inputs_to_path(self, btn_path):
-        self.inputs[self.lastInput].append(btn_path)
-        print("[PATH] " + self.lastInput + " added to path: " + str(btn_path))
+        self.inputs[self.lastInputs[-1]].append(btn_path)
+        print("[PATH] " + str(self.lastInputs[-1]) + " added to path: " + str(btn_path))
 
-    def _navigate_to_state(self, clicks_path, timeout=2):
-        print("[NAVIGATE] Replaying the click sequence: " + str(clicks_path))
-        for idx, btn_path in enumerate(clicks_path):
-            print("[NAVIGATE] (" + str(idx+1) + "/" + str(len(clicks_path)) + ") Clicking on: " + str(btn_path))
-            self.sikuli.click_image(btn_path, timeout=timeout, retries = 8, similarity_reduction = 0.05)
-            time.sleep(self.delay)
+    def _navigate_to_state(self, action_dict, action_list):
+        print("[NAVIGATE] Replaying the sequence: ")
+        for idx, action in enumerate(action_list):
+            for btn in action_dict[action]:
+                print("[SEQUENCE] " + str(btn))
+                result, text = self._do_action(action, btn)
+                if not result:
+                    print("[ERROR] Failed to navigate to state: " + str(btn))
+                    break
         print("[NAVIGATE] Click sequence completed.")
 
     def _ensure_executable_running(self):
@@ -320,10 +353,14 @@ if __name__ == "__main__":
     parser.add_argument("--practical_graph_file", required=True, help="Name of the practical graph file to save.")
     parser.add_argument("--selected_executable", required=True, help="Path to the executable to run.")
     parser.add_argument("--delay", type=int, default=5, help="Delay in seconds between actions.")
+    parser.add_argument("--debug_images", action="store_true", help="Enable debug images.")
     parser.add_argument("--timeout", type=int, default=2, help="Timeout in seconds for image matching.")
     parser.add_argument("--initial_similarity", type=float, default=0.99, help="Initial similarity for image matching.")
     parser.add_argument("--min_similarity", type=float, default=0.85, help="Minimum similarity for image matching.")
     parser.add_argument("--similarity_step", type=float, default=0.01, help="Similarity step for image matching.")
+    parser.add_argument("--retries", type=int, default=8, help="Number of retries for image matching.")
+    parser.add_argument("--state_reset_method", type=str, default=StateResetMethod.RELAUNCH, choices=[StateResetMethod.RELAUNCH, StateResetMethod.INTERNAL_RESET], help="State reset method to use.")
+    parser.add_argument("--internal_reset_script", type=str, help="Path to the internal reset script to run. Only used if state_reset_method is INTERNAL_RESET.")
 
     args = parser.parse_args()
 
@@ -332,9 +369,13 @@ if __name__ == "__main__":
         practical_graph_file=args.practical_graph_file, 
         selected_executable=args.selected_executable,
         delay=args.delay,
+        debug_images=args.debug_images,
         timeout=args.timeout,
         initial_similarity=args.initial_similarity,
         min_similarity=args.min_similarity,
-        similarity_step=args.similarity_step
+        similarity_step=args.similarity_step,
+        retries=args.retries,
+        state_reset_method=args.state_reset_method,
+        internal_reset_script=args.internal_reset_script
     )
     generator.generate_graph()

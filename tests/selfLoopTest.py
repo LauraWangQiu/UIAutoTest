@@ -32,7 +32,7 @@ class SelfLoopTest(Test):
                     file.write("No self loops found\n")
                 else:
                     for node in self.selfLoopList:
-                        file.write("[SELF LOOP NODE ]" + node.name + "\n")   
+                        file.write("[SELF LOOP NODE ] " + node.name + "\n")   
         except Exception as e:
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:

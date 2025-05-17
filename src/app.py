@@ -38,10 +38,14 @@ class App(ctk.CTk):
                 generate_graph,
                 selected_executable,
                 executable_delay,
+                debug_images,
                 timeout,
                 initial_similarity,
                 min_similarity,
                 similarity_step,
+                retries,
+                state_reset_method,
+                internal_reset_script,
                 tests_to_run,
                 solution_file,
                 headless=False):
@@ -63,10 +67,14 @@ class App(ctk.CTk):
         self.test_classes           = None                              # List of test classes        
         self.selected_executable    = selected_executable               # Selected executable path
         self.executable_delay       = executable_delay                  # Delay for the executable to start
+        self.debug_images           = debug_images                      # Flag to show debug images when generating the graph
         self.timeout                = timeout                           # Timeout for SikuliX
         self.initial_similarity     = initial_similarity                # Initial similarity for SikuliX
         self.min_similarity         = min_similarity                    # Minimum similarity for SikuliX
         self.similarity_step        = similarity_step                   # Similarity step for SikuliX
+        self.retries                = retries                           # Number of retries for SikuliX
+        self.state_reset_method     = state_reset_method                # State reset method
+        self.internal_reset_script  = internal_reset_script             # Internal reset script
         self.tests_to_run           = tests_to_run                      # List of tests to run
         self.solution_file          = solution_file                     # Test solution file
         self.headless               = headless                          # Store the headless mode flag
@@ -1076,17 +1084,16 @@ class App(ctk.CTk):
         theorical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
 
         # Entry to display the selected theorical graph file
-        self.theorical_graph_var = ctk.StringVar(value=self.theorical_graph_file)
-        self.theorical_graph_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.theorical_graph_var, state="readonly", font=ctk.CTkFont(size=12))
-        self.theorical_graph_entry.pack(fill="x", padx=10, pady=5)
+        self.selected_practical_graph_var = ctk.StringVar(value=self.theorical_graph_file)
+        self.selected_practical_graph_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.selected_practical_graph_var, state="readonly", font=ctk.CTkFont(size=12))
+        self.selected_practical_graph_entry.pack(fill="x", padx=10, pady=5)
 
-        # Button to select theorical graph file
-        select_theorical_graph_button = ctk.CTkButton(
+        select_practical_graph_button = ctk.CTkButton(
             scrollable_frame,
-            text="Select Theoretical Graph File",
-            command=self.select_theorical_graph_file
+            text="Select Practical Graph File",
+            command=self.select_practical_graph_file
         )
-        select_theorical_graph_button.pack(padx=10, pady=5, anchor="w")
+        select_practical_graph_button.pack(padx=10, pady=5, anchor="w")
 
         # Run tests button
         run_button = ctk.CTkButton(scrollable_frame, text="Run Tests", command=self.run_tests)
@@ -1153,9 +1160,9 @@ class App(ctk.CTk):
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
         )
         if file_path:
-            self.practical_graph_file = file_path
-            self.practical_graph_var.set(self.practical_graph_file)
-            print(f"[INFO] Practical graph file set to: {file_path}")
+            self.selected_practical_graph_file = file_path
+            self.selected_practical_graph_var.set(file_path)
+            print(f"[INFO] Practical graph file for tests set to: {file_path}")
 
     """
         Select the theorical graph file using a file dialog and update the entry field with the selected path
@@ -1221,10 +1228,17 @@ class App(ctk.CTk):
                     "--practical_graph_file", self.practical_graph_file,
                     "--selected_executable", self.selected_executable,
                     "--delay", str(self.executable_delay),
+                ]
+                if self.debug_images:
+                    command.append("--debug_images")
+                command += [
                     "--timeout", str(self.timeout),
                     "--initial_similarity", str(self.initial_similarity),
                     "--min_similarity", str(self.min_similarity),
-                    "--similarity_step", str(self.similarity_step)
+                    "--similarity_step", str(self.similarity_step),
+                    "--retries", str(self.retries),
+                    "--state_reset_method", str(self.state_reset_method),
+                    "--internal_reset_script", str(self.internal_reset_script),
                 ]
                 print("[INFO] Running Jython script: " + " ".join(command))
                 process = subprocess.Popen(
@@ -1324,7 +1338,7 @@ class App(ctk.CTk):
                         continue
                 if not found:
                     print("[INFO] Transition not found: " + trans1.image)
-                    file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + "\n")
+                    file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + " " + trans1.image + "\n")
                     differences_found += 1
         return differences_found
 
@@ -1362,6 +1376,16 @@ class App(ctk.CTk):
         jython_button = ctk.CTkButton(settings_tab, text="Select Jython Jar", command=self.select_jython_jar)
         jython_button.pack(padx=10, pady=5, anchor="w")
 
+        # Name of the practical graph file to export
+        practical_graph_label = ctk.CTkLabel(settings_tab, text="Practical Graph File to Export:", font=ctk.CTkFont(size=12))
+        practical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.export_practical_graph_var = ctk.StringVar(value=self.practical_graph_file if self.practical_graph_file else "")
+        self.export_practical_graph_entry = ctk.CTkEntry(settings_tab, textvariable=self.export_practical_graph_var, width=400)
+        self.export_practical_graph_entry.pack(fill="x", padx=10, pady=2)
+        def on_export_practical_graph_change(*args):
+            self.export_practical_graph_file = self.export_practical_graph_var.get()
+        self.export_practical_graph_var.trace_add("write", lambda *args: on_export_practical_graph_change())
+
         # Name of the solution file
         solution_label = ctk.CTkLabel(settings_tab, text="Solution File:", font=ctk.CTkFont(size=12))
         solution_label.pack(anchor="w", padx=10, pady=(10, 2))
@@ -1371,27 +1395,6 @@ class App(ctk.CTk):
         def on_solution_change(*args):
             self.solution_file = self.solution_var.get()
         self.solution_var.trace_add("write", lambda *args: on_solution_change())
-
-        # Name of the practical graph file
-        practical_graph_label = ctk.CTkLabel(settings_tab, text="Practical Graph File:", font=ctk.CTkFont(size=12))
-        practical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
-        self.practical_graph_var = ctk.StringVar(value=self.practical_graph_file if self.practical_graph_file else "")
-        self.practical_graph_entry = ctk.CTkEntry(settings_tab, textvariable=self.practical_graph_var, width=400)
-        self.practical_graph_entry.pack(fill="x", padx=10, pady=2)
-        def on_practical_graph_change(*args):
-            self.practical_graph_file = self.practical_graph_var.get()
-        self.practical_graph_var.trace_add("write", lambda *args: on_practical_graph_change())
-
-        # Name of the theorical graph file
-        theorical_graph_label = ctk.CTkLabel(settings_tab, text="Theoretical Graph File:", font=ctk.CTkFont(size=12))
-        theorical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
-        self.theorical_graph_var = ctk.StringVar(value=self.theorical_graph_file if self.theorical_graph_file else "")
-        self.theorical_graph_entry = ctk.CTkEntry(settings_tab, textvariable=self.theorical_graph_var, width=400)
-        self.theorical_graph_entry.pack(fill="x", padx=10, pady=2)
-        def on_theorical_graph_change(*args):
-            self.theorical_graph_file = self.theorical_graph_var.get()
-        self.theorical_graph_var.trace_add("write", lambda *args: on_theorical_graph_change())
-
 
     def select_java_path(self):
         file_path = filedialog.askopenfilename(
