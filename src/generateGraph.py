@@ -46,7 +46,6 @@ class GenerateGraph:
         self.stop_loop = threading.Event()
         self.process = None
         self.executable_thread = None
-        self.loop_thread = None
 
         self.buttons_dir = "buttons"
         self.default_state_name = "State_"
@@ -87,12 +86,7 @@ class GenerateGraph:
         self.executable_thread = threading.Thread()
         self.executable_thread.start()
 
-        self.loop_thread = threading.Thread(target=self._loop)
-        self.loop_thread.start()
-
-        self.loop_thread.join()
-        self.executable_thread.join()
-
+        self._loop()
         self._stop_executable()
         if self.graph is None:
             print("[ERROR] No graph generated.")
