@@ -175,5 +175,6 @@ cython_debug/
 
 .vscode
 imgs/
+DebugImages/
 jython-standalone-2.7.4.jar
 sikulixapi-2.0.5.jar

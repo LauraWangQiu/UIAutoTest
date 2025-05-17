@@ -1,63 +1,65 @@
 # -*- coding: utf-8 -*-
-# generateGraph.py ARREGLADO - DFS Recursivo
-
 import argparse
 import os
+import shutil
 import subprocess
 import threading
 import time
 from sikulixWrapper import SikulixWrapper
 from graphsDef import Graph, Transition
 from actionTypes import ActionType
-import GraphIO as _graph_io_module
+from stateResetMethod import StateResetMethod
+import graphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
-import shutil
-import tempfile
 
 class GenerateGraph:
     valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp'}
 
-    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5, timeout=2, initial_similarity=0.99, min_similarity=0.85, similarity_step=0.01):
+    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5, timeout=2, initial_similarity=0.99, min_similarity=0.85, similarity_step=0.01, state_reset_method=StateResetMethod.RELAUNCH):
+        self.graph_io = GraphIO()  
+        self.sikuli = SikulixWrapper()
+
         self.images_dir = images_dir
         self.practical_graph_file = practical_graph_file
         self.selected_executable = selected_executable
-        self.visited_states = set()
-        self.inputs = {
-            value: [] for name, value in vars(ActionType).items()
-            if not name.startswith("__") and not callable(value)
-        }
-        self.lastInput = None
-        self.full_images_dir = os.path.join(os.getcwd(), self.images_dir)
-        self.graph = None
         self.delay = delay
-        self.process = None
-        self.sikuli = SikulixWrapper()        
-        self.graph_io = GraphIO()  
-        self._stop_loop = threading.Event()
-        self._executable_thread = None
-        self._loop_thread = None
-        self.phantom_state_counter = 0
-        self.buttons_dir = "buttons"
-        self.default_state_name = "State_"
-        self.debug_name = "DebugImages"
-        self.full_debug_name = os.path.join(os.getcwd(), self.debug_name)
         self.initial_similarity = initial_similarity
         self.min_similarity = min_similarity
         self.similarity_step = similarity_step
         self.timeout = timeout
-        self._temp_build_dir = None
-        self._temp_executable_path = None
+        self.state_reset_method = state_reset_method
+
+        self.graph = None
+        self.visited_states = set()
+        self.lastInput = None
+        self.inputs = {
+            value: [] for name, value in vars(ActionType).items()
+            if not name.startswith("__") and not callable(value)
+        }
+
+        self.stop_loop = threading.Event()
+        self.process = None
+        self.executable_thread = None
+        self.loop_thread = None
+
+        self.buttons_dir = "buttons"
+        self.default_state_name = "State_"
+        self.debug_name = "DebugImages"
+        self.full_debug_name = os.path.join(os.getcwd(), self.debug_name)
+        self.full_images_dir = os.path.join(os.getcwd(), self.images_dir)
+        
+        self.phantom_state_counter = 0
         
     def generate_graph(self):
         print("[INFO] Generating graph for " + str(self.selected_executable))
-        self._executable_thread = threading.Thread()
-        self._executable_thread.start()
+        self.executable_thread = threading.Thread()
+        self.executable_thread.start()
 
-        self._loop_thread = threading.Thread(target=self._loop)
-        self._loop_thread.start()
+        self.loop_thread = threading.Thread(target=self._loop)
+        self.loop_thread.start()
 
-        self._loop_thread.join()
-        self._executable_thread.join()
+        self.loop_thread.join()
+        self.executable_thread.join()
 
         self._stop_executable()
         if self.graph is None:
@@ -71,50 +73,16 @@ class GenerateGraph:
                 print("[INFO] Image: " + str(transition.image))
 
         self.graph_io.write_graph(self.images_dir, self.practical_graph_file, self.graph)
-        print("[INFO] graph has been saved to " + str(self.practical_graph_file))
 
     def _start_executable(self):
         try:
-            print("[DEBUG] Starting _start_executable method")
-            # 1. Identify the original build folder
-            original_executable = os.path.abspath(self.selected_executable)
-            print("[DEBUG] original_executable: " + str(original_executable))
-            build_dir = os.path.dirname(original_executable)
-            print("[DEBUG] build_dir: " + str(build_dir))
-
-            # 2. Create a temporary folder
-            
-            parent_dir = os.path.dirname(build_dir)
-            tmp_dir = os.path.join(parent_dir, "tmp")
-            print("[DEBUG] Temporary build directory path: " + str(tmp_dir))
-            # If tmp already exists, remove it to start fresh
-            if os.path.exists(tmp_dir):
-                shutil.rmtree(tmp_dir)
-                print("[DEBUG] Existing tmp directory removed.")
-            os.makedirs(tmp_dir)
-            print("[DEBUG] Temporary build directory created: " + str(tmp_dir))
-            self._temp_build_dir = tmp_dir
-            # 3. Copy ALL build content to the temporary folder
-            for item in os.listdir(build_dir):
-                s = os.path.join(build_dir, item)
-                d = os.path.join(self._temp_build_dir, item)
-                print("[DEBUG] Copying item: " + str(s) + " to " + str(d))
-                if os.path.isdir(s):
-                    shutil.copytree(s, d)
-                    print("[DEBUG] Directory copied: " + str(s))
-                else:
-                    shutil.copy2(s, d)
-                    print("[DEBUG] File copied: " + str(s))
-
-            # 4. Adjust the executable path to the temporary copy
-            self._temp_executable_path = os.path.join(self._temp_build_dir, os.path.basename(original_executable))
-            print("[INFO] Starting executable (temporal copy): " + self._temp_executable_path)
-            self.process = subprocess.Popen([self._temp_executable_path])
+            print("[INFO] Starting executable: " + self.selected_executable)
+            self.process = subprocess.Popen([self.selected_executable])
             print("[DEBUG] Executable process started: " + str(self.process))
             self.process.wait()
             print("[DEBUG] Executable process finished")
         except FileNotFoundError:
-            print("[INFO] Executable not found (temp copy): " + str(self._temp_executable_path))
+            print("[INFO] Executable not found: " + str(self.selected_executable))
             self.process = None
         except Exception as e:
             print("[ERROR] Exception in _start_executable: " + str(e))
@@ -122,31 +90,24 @@ class GenerateGraph:
     def _stop_executable(self):
         try:
             if self.process is not None:
-                print("[INFO] Stopping executable: " + str(self._temp_executable_path))
+                print("[INFO] Stopping executable: " + str(self.selected_executable))
                 self.process.terminate()
                 try:
-                    self.process.wait(timeout=5)
+                    self.process.wait(timeout=self.delay)
                 except Exception:
                     print("[INFO] Forcing the executable to stop...")
                     self.process.kill()
                     self.process.wait()
                 print("[INFO] Executable terminated.")
                 self.process = None
-            if self._executable_thread is not None and self._executable_thread.is_alive():
+            if self.executable_thread is not None and self.executable_thread.is_alive():
                 print("[INFO] Waiting the executable thread to end...")
-                self._executable_thread.join(timeout=5)
+                self.executable_thread.join(timeout=5)
                 print("[INFO] Executable thread ended.")
         except Exception as e:
             print("[ERROR] Error on closing executable: "+str(e))
             self.process = None
-        # --- Borra la carpeta temporal (limpia todo) ---
-        if self._temp_build_dir and os.path.exists(self._temp_build_dir):
-            shutil.rmtree(self._temp_build_dir)
-            print("[INFO] Temp build directory deleted:"+ self._temp_build_dir)
-            self._temp_build_dir = None
 
-
-    # --- DFS recursivo ---
     def _loop(self):
         # Check if the images directory exists and is a directory
         if not os.path.isdir(self.full_images_dir):
@@ -164,7 +125,7 @@ class GenerateGraph:
         self.graph.set_start_node(self._dfs_state())
         print("[LOOP] DFS graph loop finished.")
         self._stop_executable()
-        self._stop_loop.set()
+        self.stop_loop.set()
 
     def _dfs_state(self):
         current_state = None        # Node object
@@ -200,7 +161,6 @@ class GenerateGraph:
             similarity -= self.similarity_step
 
         if current_state is not None:
-            found = False
             self.sikuli.capture_error(current_state_name, self.full_debug_name)
             if current_state not in self.visited_states:
                 print("[DFS] Visiting state: " + str(current_state))
@@ -242,14 +202,14 @@ class GenerateGraph:
                             print("[DFS] Simulating " + action_type + " with button image: " + str(btn_path))
                             self.lastInput = action_type
                             self.sikuli.capture_error(btn, self.full_debug_name)
-                            result = self.do_action(action_type, btn_path)
+                            result = self._do_action(action_type, btn_path)
                             if not result:
                                 print("[DFS] Could not " + self.lastInput + " on: " + str(btn_path))
                                 continue
                             
                             found = True                            
                             time.sleep(self.delay)
-                            self.add_inputs_to_path(btn_path)
+                            self._add_inputs_to_path(btn_path)
                             dst_node = self._dfs_state()
                             print("[DFS] Creating transition from node: " + str(current_state_name) + " with image: " + str(btn_path))
                             transition = self.graph.add_transition(current_state, dst_node)
@@ -278,7 +238,7 @@ class GenerateGraph:
         
         return current_state
 
-    def do_action(self, action_type, btn_path, text=None, btn2_path=None, similarity=1.0, timeout=0.01, retries=6, similarity_reduction=0.1, clear_before=False):
+    def _do_action(self, action_type, btn_path, text=None, btn2_path=None, similarity=1.0, timeout=0.01, retries=6, similarity_reduction=0.1, clear_before=False):
         if action_type is None or not ActionType.is_valid_action(action_type):
             print("[ERROR] No action type selected.")
             return False
@@ -315,13 +275,13 @@ class GenerateGraph:
         if not self.inputs[self.lastInput]:
             return
         self._ensure_executable_running()
-        self.navigate_to_state(self.inputs[self.lastInput])
+        self._navigate_to_state(self.inputs[self.lastInput])
 
-    def add_inputs_to_path(self, btn_path):
+    def _add_inputs_to_path(self, btn_path):
         self.inputs[self.lastInput].append(btn_path)
         print("[PATH] " + self.lastInput + " added to path: " + str(btn_path))
 
-    def navigate_to_state(self, clicks_path, timeout=2):
+    def _navigate_to_state(self, clicks_path, timeout=2):
         print("[NAVIGATE] Replaying the click sequence: " + str(clicks_path))
         for idx, btn_path in enumerate(clicks_path):
             print("[NAVIGATE] (" + str(idx+1) + "/" + str(len(clicks_path)) + ") Clicking on: " + str(btn_path))
@@ -331,42 +291,9 @@ class GenerateGraph:
 
     def _ensure_executable_running(self):
         if self.process is None:
-            self._executable_thread = threading.Thread(target=self._start_executable)
-            self._executable_thread.start()
+            self.executable_thread = threading.Thread(target=self._start_executable)
+            self.executable_thread.start()
             time.sleep(self.delay)
-
-    def input_sikuli(self, buttons_path, node, visited_images):
-        print("[INPUT_SIKULI] Iniciando input_sikuli...")
-        path = self.check_transition(os.path.join(buttons_path,"click"), node) 
-        print("[INPUT_SIKULI] Path: " + str(path))
-        if path is not None:
-            self.click(path, node, visited_images)
-        else:
-            return None
-
-    def check_transition(self, buttons_path, node):
-        if not os.path.isdir(buttons_path):
-            return None
-        buttons_images = [f for f in os.listdir(buttons_path) if os.path.isfile(os.path.join(buttons_path, f))]
-        transition_images = {t.image for t in node.transitions}
-        for img_f in buttons_images:
-            if os.path.join(buttons_path, img_f) not in transition_images or len(transition_images) == 0:
-                print("[INPUT_SIKULI] Image not found in transitions: " + img_f)
-                return os.path.join(buttons_path, img_f)
-            else:
-                print("[INPUT_SIKULI] Image found: " + img_f)
-        print("[INPUT_SIKULI] All transitions visited.")
-        return None
-
-    def click(self, image_path, node, visited_images):
-        print("[INPUT_SIKULI] Clicking on image: " + image_path)
-        transition = Transition(node)
-        print("[INPUT_SIKULI] Transitions: ", node.transitions)
-        transition.image = image_path
-        node.add_transition(transition)
-        self.sikuli.click_image(image_path, timeout=0.001,retries=8,similarity_reduction= 0.05)
-        if image_path not in visited_images:
-            visited_images.add(image_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a graph using SikuliX and a specified executable.")

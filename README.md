@@ -69,5 +69,5 @@ The variables in `config.json` are the following:
 - `initial_similarity`: the initial similarity value (from 0 to 1) used to start searching for images on the screen with Sikulix. A value of 1 means an exact match is required; 0 means no similarity is required
 - `min_similarity`: the minimum similarity value (from 0 to 1) allowed when searching for images on the screen with Sikulix. If no image is found with the initial similarity, the search will continue decreasing the similarity down to this minimum value
 - `similarity_step`: the amount by which the similarity value is decreased in each step when searching for images on the screen. The search starts at `initial_similarity` and decreases by this value until reaching `min_similarity`
-- `tests_to_run`: [`EdgePairCovTest`, `PrimePathCovTest`, `SelfLoopTest`, `TotalConnectTest`]
+- `tests_to_run`: lists of tests to run, the names of the tests classes must be given and should be located in `tests_dir`, we provide the following tests: [`EdgePairCovTest`, `PrimePathCovTest`, `SelfLoopTest`, `TotalConnectTest`]
 - `solution_file`: name of the final report file, it is set to `solution.txt` by default

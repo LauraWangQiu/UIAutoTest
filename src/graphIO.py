@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
-import sys
 from actionTypes import ActionType
-from graphsDef import Graph, Transition
+from graphsDef import Graph
 
 def singleton(cls):
     """

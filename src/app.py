@@ -15,7 +15,7 @@ from PIL import Image, ImageTk
 from test import Test
 from graphsDef import Graph, Transition
 from actionTypes import ActionType
-import GraphIO as _graph_io_module
+import graphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
 
 class App(ctk.CTk):
