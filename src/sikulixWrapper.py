@@ -117,7 +117,7 @@ class SikulixWrapper:
         :param clear_before: If True, clears the field before typing.
         :return: True if successful, False otherwise.
     """
-    def write_text(self, image_path, text, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, clear_before=False, debug_image_name= "debug_image", debug_image_path=".", capture_last_match=False):
+    def write_text(self, image_path, text, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, clear_before=False, debug_image_name= "debug_image", debug_image_path=".", capture_last_match=False, enter = True):
         for attempt in range(retries):
             actual_similarity = similarity - (similarity_reduction * attempt)
             actual_attempt = attempt + 1
@@ -131,7 +131,10 @@ class SikulixWrapper:
                 if clear_before:
                     self.screen.type("a", KeyModifier.CTRL)  # Select all
                     self.screen.type(Key.BACKSPACE)          # Clear
-                self.screen.type(text)
+                if(enter):
+                    self.screen.type(text + Key.ENTER)
+                else:
+                    self.screen.type(text)
                 print("[OK] Text written.")
                 return True
             else:
@@ -184,7 +187,7 @@ class SikulixWrapper:
                 filepath = self.screen.capture(reg).save(folder, filename)
             else:
                 filepath = self.screen.capture().save(folder, filename)
-            print("[CAPTURE] Saved screenshot:" + filepath)
+            print("[CAPTURE] Saved screenshot: " + filepath)
             return filepath
         except Exception as e:
             print("[ERROR] Failed to save screenshot:" + str(e))

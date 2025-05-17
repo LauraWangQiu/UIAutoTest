@@ -81,7 +81,7 @@ class GenerateGraph:
             print("[DEBUG] Executable process started: " + str(self.process))
             self.process.wait()
             print("[DEBUG] Executable process finished")
-        except FileNotFoundError:
+        except OSError:
             print("[INFO] Executable not found: " + str(self.selected_executable))
             self.process = None
         except Exception as e:
@@ -163,7 +163,7 @@ class GenerateGraph:
         if current_state is not None:
             self.sikuli.capture_error(current_state_name, self.full_debug_name)
             if current_state not in self.visited_states:
-                print("[DFS] Visiting state: " + str(current_state))
+                print("[DFS] Visiting state: " + str(current_state.name))
                 self.visited_states.add(current_state)
 
                 # If there are no action types, return the current state (first found state)
@@ -199,15 +199,19 @@ class GenerateGraph:
                         print("[DFS] Buttons images found: " + str(buttons_input_path))
                         for idx, btn in enumerate(buttons_input_path_names):
                             btn_path = os.path.join(buttons_input_path, btn)
+                            
+                            if os.path.splitext(btn)[1].lower() not in self.valid_extensions:
+                                print("[DFS] Skipping non-image file: " + str(btn_path))
+                                continue
                             print("[DFS] Simulating " + action_type + " with button image: " + str(btn_path))
                             self.lastInput = action_type
                             self.sikuli.capture_error(btn, self.full_debug_name)
-                            result = self._do_action(action_type, btn_path)
+                            text = None
+                            result,text = self.do_action(action_type, btn_path,text)
                             if not result:
                                 print("[DFS] Could not " + self.lastInput + " on: " + str(btn_path))
                                 continue
-                            
-                            found = True                            
+                                                  
                             time.sleep(self.delay)
                             self._add_inputs_to_path(btn_path)
                             dst_node = self._dfs_state()
@@ -215,8 +219,11 @@ class GenerateGraph:
                             transition = self.graph.add_transition(current_state, dst_node)
                             transition.update_action(action_type)
                             transition.update_image(btn_path)
-                        
-            self._restart_executable_and_continue()
+                            if action_type == ActionType.CLICK_AND_TYPE:
+                                transition.update_text(text)
+                            self._restart_executable_and_continue()
+                            
+            
 
         else:
             print("[DFS] Current state not found")
@@ -238,7 +245,7 @@ class GenerateGraph:
         
         return current_state
 
-    def _do_action(self, action_type, btn_path, text=None, btn2_path=None, similarity=1.0, timeout=0.01, retries=6, similarity_reduction=0.1, clear_before=False):
+    def do_action(self, action_type, btn_path, text=str, btn2_path=None, similarity=1.0, timeout=0.01, retries=8, similarity_reduction=0.1, clear_before=False,enter=True):
         if action_type is None or not ActionType.is_valid_action(action_type):
             print("[ERROR] No action type selected.")
             return False
@@ -252,11 +259,15 @@ class GenerateGraph:
             return False
             # self.sikuli.double_click_image(btn_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, capture_last_match = True)
         elif action_type == ActionType.CLICK_AND_TYPE:
-            if text is None:
-                print("[ERROR] No text provided for click and type.")
+            txt_path = os.path.splitext(btn_path)[0] + ".txt"
+            if os.path.isfile(txt_path):
+               with open(txt_path, "r") as f:
+                  text = f.read().strip()
+            else:
+                print("[ERROR] No .txt file found for click and type: " + str(txt_path))
                 return False
-            print("[INFO] Clicking and typing on: " + str(btn_path))
-            result = self.sikuli.write_text(btn_path, text=text, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, clear_before=clear_before)
+            print("[INFO] Clicking and typing on: " + str(btn_path) + " with text: " + str(text))
+            result = self.sikuli.write_text(btn_path, text=text, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, clear_before=clear_before,enter=enter)
         elif action_type == ActionType.DRAG_AND_DROP:
             if btn2_path is None:
                 print("[ERROR] No second button path provided for drag and drop.")
@@ -264,16 +275,24 @@ class GenerateGraph:
             print("[INFO] Dragging and dropping from: " + str(btn_path) + " to: " + str(btn2_path))
             result = self.sikuli.drag_and_drop(btn_path, btn2_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction)
 
-        return result
+        return result,text
 
     def _restart_executable_and_continue(self):
+        print("[RESTART] Restarting executable...")
         self._stop_executable()
+        print("Before if's" , self.inputs)
+        
+        print("Self last input" , self.lastInput)
         if not self.lastInput or not self.inputs.get(self.lastInput):
             return
         if self.inputs[self.lastInput]:
+            print("Before pop ", self.inputs)
             self.inputs[self.lastInput].pop()
-        if not self.inputs[self.lastInput]:
+            print("After pop", self.inputs)
+            
+        else: 
             return
+        
         self._ensure_executable_running()
         self._navigate_to_state(self.inputs[self.lastInput])
 
