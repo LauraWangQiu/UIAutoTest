@@ -24,7 +24,6 @@ class EdgePairCovTest(Test):
         
         content = "\n".join(f"From '{origin}' to '{dest}'" for origin, dest in self.edgePairCovList)
         self.notify_update("edgePairCovList", content)
-        self.write_solution()
 
     def write_solution(self):
         try:

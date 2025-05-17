@@ -41,8 +41,11 @@ class GraphIO:
         self.graph = None
         print("[INFO] Loading graph from " + graph_file)
         try:
-            if not os.path.isfile(graph_file):
-                print("[ERROR] Graph file not found: " + graph_file)
+            if img_dir is None or not os.path.isdir(img_dir):
+                print("[ERROR] Image directory not found: " + str(img_dir))
+                return None
+            if graph_file is None or not os.path.isfile(graph_file):
+                print("[ERROR] Graph file not found: " + str(graph_file))
                 return None
         
             self.graph = Graph()  # Create a new Graph instance

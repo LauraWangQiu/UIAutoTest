@@ -22,7 +22,6 @@ class SelfLoopTest(Test):
 
         content = "\n".join(node.name for node in self.selfLoopList)
         self.notify_update("selfLoopList", content)
-        self.write_solution()
 
     def write_solution(self):
         try:

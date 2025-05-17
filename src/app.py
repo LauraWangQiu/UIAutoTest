@@ -99,15 +99,15 @@ class App(ctk.CTk):
 
         if self.headless:
             print("[INFO] Application initialized in headless mode")
-            self.load_graph_from_file(self.theorical_graph_file)
-            self.test_classes = self.get_test_classes()
-            if self.generate_graph:
-                self.generate_graph_from_executable()
-                while self.jython_thread.is_alive():
-                    time.sleep(0.1)
-            self.run_tests()
-            self.compare()
-            self.create_PDF(self.pdf_file)
+            if self.load_graph_from_file(self.theorical_graph_file):
+                self.test_classes = self.get_test_classes()
+                if self.generate_graph:
+                    self.generate_graph_from_executable()
+                    while self.jython_thread.is_alive():
+                        time.sleep(0.1)
+                self.run_tests()
+                self.compare()
+                self.create_PDF(self.pdf_file)
         else: 
             super().__init__()
             self.stop_event = threading.Event()
@@ -130,11 +130,17 @@ class App(ctk.CTk):
     def load_graph_from_file(self, file_name):
         try:
             self.graph = self.graph_io.load_graph(file_name, self.images_dir)
+            if self.graph is None:
+                print("[ERROR] Graph not loaded")
+                return False
             print("[INFO] Graph successfully loaded")
+            return True
         except FileNotFoundError:
             print("[ERROR] File " + file_name + " not found")
         except Exception as e:
             print("[ERROR] An error occurred while loading the graph: " + str(e))
+
+        return False
 
     """
         Configure the grid layout of the main window
@@ -1205,6 +1211,10 @@ class App(ctk.CTk):
             print("[ERROR] No executable selected. Please select an executable first.")
             return
         
+        if not self.images_dir:
+            print("[ERROR] No images directory selected. Please select an images directory first.")
+            return
+
         self.run_jython()
 
     """
@@ -1296,6 +1306,7 @@ class App(ctk.CTk):
             test_class_name = getattr(test_instance, "name", test_class_ref.__name__)
             test_instance.set_update_callback(lambda attr_name, content, tcn=test_class_name: self.update_test_output(tcn, attr_name, content))
             test_instance.run()
+            test_instance.write_solution()
             test_instances.append((test_class_name, test_instance))
 
     """

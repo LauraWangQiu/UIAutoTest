@@ -21,7 +21,6 @@ class TotalConnectTest(Test):
         self.notify_update("visited_states", content)
         content = "\n".join(f"{origin} → {dest}" for origin, dest in self.visited_transitions)
         self.notify_update("visited_transitions", content)
-        self.write_solution()
 
     """
         Overrides the parent write_solution method

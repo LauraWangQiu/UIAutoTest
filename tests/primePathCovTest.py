@@ -30,7 +30,6 @@ class PrimePathCovTest(Test):
 
         content = "\n".join(" → ".join(node.name for node in path) for path in self.prime_paths)
         self.notify_update("prime_paths", content)
-        self.write_solution()
         
     # DFS method to get all the paths.
     def dfs(self, current, visited, path, all_paths):
