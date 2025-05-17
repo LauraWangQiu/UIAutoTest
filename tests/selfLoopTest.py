@@ -11,8 +11,6 @@ class SelfLoopTest(Test):
     """
     def run(self):
         print("Running " + self.name + ".")
-        #self.selfLoopList.clear()
-
         for node in self.graph.nodes:
             # See all the transitions of the node
             for transitions in node.transitions:
@@ -27,15 +25,7 @@ class SelfLoopTest(Test):
 
         content = "\n".join(node.name for node in self.selfLoopList)
         self.notify_update("selfLoopList", content)
-
         self.write_solution()
-
-    def set_update_callback(self, callback):
-        self._update_callback = callback
-
-    def notify_update(self, attr_name, content):
-        if self._update_callback:
-            self._update_callback(attr_name, content)
 
     def write_solution(self):
         try:

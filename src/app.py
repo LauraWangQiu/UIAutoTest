@@ -4,6 +4,7 @@ import sys
 import subprocess
 import threading
 import math
+import time
 import inspect
 import importlib.util
 import customtkinter as ctk
@@ -37,8 +38,12 @@ class App(ctk.CTk):
                 generate_graph,
                 selected_executable,
                 executable_delay,
+                timeout,
+                initial_similarity,
+                min_similarity,
+                similarity_step,
                 tests_to_run,
-                test_solution_file,
+                solution_file,
                 headless=False):
         self.java_path = java_path                                      # Path to Java executable
         self.jython_jar = jython_jar                                    # Path to Jython jar file
@@ -49,28 +54,36 @@ class App(ctk.CTk):
             
         self.graph_io = GraphIO()                                       # GraphIO instance
         self.graph = Graph()                                            # Theorical graph
-        self.graph_exe = Graph()                                        # Practical graph
+        self.generated_graph = None                                     # Practical graph
         self.theorical_graph_file   = theorical_graph_file              # Theoretical graph file
         self.practical_graph_file   = practical_graph_file              # Practical graph file
         self.generate_graph         = generate_graph                    # Flag to generate graph
         self.images_dir             = images_dir                        # Directory of images
         self.tests_dir              = tests_dir                         # Directory of tests
-        self.test_classes = self.get_test_classes()         
+        self.test_classes           = None                              # List of test classes        
         self.selected_executable    = selected_executable               # Selected executable path
         self.executable_delay       = executable_delay                  # Delay for the executable to start
+        self.timeout                = timeout                           # Timeout for SikuliX
+        self.initial_similarity     = initial_similarity                # Initial similarity for SikuliX
+        self.min_similarity         = min_similarity                    # Minimum similarity for SikuliX
+        self.similarity_step        = similarity_step                   # Similarity step for SikuliX
         self.tests_to_run           = tests_to_run                      # List of tests to run
-        self.test_solution_file     = test_solution_file                # Test solution file
+        self.solution_file          = solution_file                     # Test solution file
         self.headless               = headless                          # Store the headless mode flag
 
+        self.test_checkboxes = {}
         self.test_output_widgets = {}
-        self.test_instances = {}
 
         if self.headless:
             print("[INFO] Application initialized in headless mode")
             self.load_graph_from_file(self.theorical_graph_file)
+            self.test_classes = self.get_test_classes()
             if self.generate_graph:
                 self.generate_graph_from_executable()
+                while self.jython_thread.is_alive():
+                    time.sleep(0.1)
             self.run_tests()
+            self.compare()
         else: 
             super().__init__()
             self.stop_event = threading.Event()
@@ -115,6 +128,8 @@ class App(ctk.CTk):
         style.configure("TNotebook.Tab", padding=[20, 10])
         style.configure("TNotebook", tabposition="nw")
 
+        self.tabs_to_keep = {"States", "Generate, Run & Compare", "Settings", "Terminal"}
+
         self.tab_control = ttk.Notebook(self)
         self.tab_control.grid(row=0, column=0, sticky="nsew")
 
@@ -123,13 +138,11 @@ class App(ctk.CTk):
         self.tab_control.add(self.states_tab, text="States")
         self.configure_states_tab()
 
-        
-        # Tests tabs
-        for test_class_name, test_class_ref in self.test_classes:
-            self.add_test_tab(test_class_name, test_class_ref)
-
         # Test Runner tab
         self.add_test_runner_tab()
+
+        # Settings tab
+        self.add_settings_tab()
 
         # Output tab
         self.add_terminal_tab()
@@ -885,9 +898,10 @@ class App(ctk.CTk):
         The tab will contain a button to run the test and the needed arguments
     """
     def add_test_tab(self, test_class_name, test_class_ref):
+
         test_instance = test_class_ref()
-        self.test_instances[test_class_name] = test_instance
         tab_name = getattr(test_instance, "name", test_class_name)
+        self.test_output_widgets[tab_name] = {}
 
         new_tab = ctk.CTkFrame(self.tab_control)
         self.tab_control.add(new_tab, text=tab_name)
@@ -897,11 +911,6 @@ class App(ctk.CTk):
 
         attributes_frame = ctk.CTkFrame(new_tab)
         attributes_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        self.test_output_widgets[test_class_name] = {}
-
-         # Pasamos el callback para que el test nos notifique
-        test_instance.set_update_callback(lambda attr_name, content: self.update_test_output(test_class_name, attr_name, content))
 
         # Show the attributes of the test class
         for attr_name, attr_value in vars(test_instance).items():
@@ -918,20 +927,25 @@ class App(ctk.CTk):
                 attr_listbox.configure(state="disabled")
                 attr_listbox.pack(fill="x", padx=5, pady=2)
 
-                self.test_output_widgets[test_class_name][attr_name] = attr_listbox
+                self.test_output_widgets[tab_name][attr_name] = attr_listbox
             # TODO: Add the needed arguments to run the test
             # elif isinstance(attr_value, list):
 
-    
     def update_test_output(self, test_class_name, attr_name, values):
         try:
+            if test_class_name not in self.test_output_widgets:
+                print(f"[WARNING] No widgets found for test class '{test_class_name}'")
+                return
+            if attr_name not in self.test_output_widgets[test_class_name]:
+                print(f"[WARNING] No widget for attribute '{attr_name}' in test class '{test_class_name}'")
+                return
             textbox = self.test_output_widgets[test_class_name][attr_name]
             textbox.configure(state="normal")
             textbox.delete("1.0", "end")
-            textbox.insert("1.0", "".join(map(str, values)))
+            textbox.insert("1.0", str(values))
             textbox.configure(state="disabled")
-        except KeyError:
-            print(f"[ERROR] No textbox found for {test_class_name}.{attr_name}")
+        except Exception as e:
+            print(f"[ERROR] update_test_output failed: {e}")
 
     # ==============================================================================================
     # TESTS RUNNER & COMPARISON TAB
@@ -960,45 +974,148 @@ class App(ctk.CTk):
         test_runner_tab = ctk.CTkFrame(self.tab_control)
         self.tab_control.add(test_runner_tab, text="Generate, Run & Compare")
 
+        # --- SCROLLABLE AREA ---
+        canvas = ctk.CTkCanvas(test_runner_tab, borderwidth=0, highlightthickness=0)
+        scrollbar = ctk.CTkScrollbar(test_runner_tab, orientation="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        scrollable_frame = ctk.CTkFrame(canvas)
+        window_id = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def on_canvas_configure(event):
+            canvas.itemconfig(window_id, width=event.width)
+
+        scrollable_frame.bind("<Configure>", on_frame_configure)
+        canvas.bind("<Configure>", on_canvas_configure)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # --- END SCROLLABLE AREA ---
+
+        # Label for the selected executable
+        exec_label = ctk.CTkLabel(scrollable_frame, text="Selected Executable:", font=ctk.CTkFont(size=12))
+        exec_label.pack(anchor="w", padx=10, pady=(10, 2))
+
         # Entry to display the selected executable path
-        self.executable_entry = ctk.CTkEntry(test_runner_tab, state="readonly", font=ctk.CTkFont(size=12))
+        self.executable_entry = ctk.CTkEntry(scrollable_frame, state="readonly", font=ctk.CTkFont(size=12))
         self.executable_entry.insert(0, "Executable: None")
         self.executable_entry.pack(fill="x", padx=10, pady=5)
 
         # Button to select executable
-        select_executable_button = ctk.CTkButton(test_runner_tab, text="Select Executable", command=self.select_executable)
-        select_executable_button.pack(fill="x", padx=10, pady=5)
+        select_executable_button = ctk.CTkButton(scrollable_frame, text="Select Executable", command=self.select_executable)
+        select_executable_button.pack(padx=10, pady=5, anchor="w")
+
+        # Label for the selected images directory
+        images_label = ctk.CTkLabel(scrollable_frame, text="Selected Images Directory:", font=ctk.CTkFont(size=12))
+        images_label.pack(anchor="w", padx=10, pady=(10, 2))
 
         # Entry to display the selected images directory
-        self.images_dir_entry = ctk.CTkEntry(test_runner_tab, state="readonly", font=ctk.CTkFont(size=12))
-        self.images_dir_entry.insert(0, "Images Directory: None")
+        self.images_dir_var = ctk.StringVar(value=self.images_dir)
+        self.images_dir_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.images_dir_var, state="readonly", font=ctk.CTkFont(size=12))
         self.images_dir_entry.pack(fill="x", padx=10, pady=5)
 
         # Button to select images directory
-        select_images_dir_button = ctk.CTkButton(test_runner_tab, text="Select Images Directory", command=self.select_images_dir)
-        select_images_dir_button.pack(fill="x", padx=10, pady=5)
+        select_images_dir_button = ctk.CTkButton(scrollable_frame, text="Select Images Directory", command=self.select_images_dir)
+        select_images_dir_button.pack(padx=10, pady=5, anchor="w")
 
         # Button to generate the graph from executable
-        generate_graph_button = ctk.CTkButton(test_runner_tab, text="Generate Graph from Executable", command=self.generate_graph_from_executable)
+        generate_graph_button = ctk.CTkButton(scrollable_frame, text="Generate Graph from Executable", command=self.generate_graph_from_executable)
         generate_graph_button.pack(fill="x", padx=10, pady=5)
 
+        # Label for the selected tests directory
+        tests_label = ctk.CTkLabel(scrollable_frame, text="Selected Tests Directory:", font=ctk.CTkFont(size=12))
+        tests_label.pack(anchor="w", padx=10, pady=(10, 2))
+
+        # Entry to display the selected tests directory
+        self.tests_dir_var = ctk.StringVar(value=self.tests_dir)
+        self.tests_dir_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.tests_dir_var, state="readonly", font=ctk.CTkFont(size=12))
+        self.tests_dir_entry.pack(fill="x", padx=10, pady=5)
+
+        # Button to select tests directory
+        select_tests_dir_button = ctk.CTkButton(
+            scrollable_frame,
+            text="Select Tests Directory",
+            command=self.select_tests_dir
+        )
+        select_tests_dir_button.pack(padx=10, pady=5, anchor="w")
+
         # Title
-        title_label = ctk.CTkLabel(test_runner_tab, text="Select Tests to Run", font=ctk.CTkFont(size=16, weight="bold"))
+        title_label = ctk.CTkLabel(scrollable_frame, text="Select Tests to Run", font=ctk.CTkFont(size=16, weight="bold"))
         title_label.pack(pady=10)
 
         # Frame for the list of tests
-        self.test_list_frame = ctk.CTkFrame(test_runner_tab)
+        self.test_list_frame = ctk.CTkFrame(scrollable_frame)
         self.test_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Populate the list of tests
-        self.populate_test_list()
+        # Label for the selected practical graph file
+        practical_graph_label = ctk.CTkLabel(scrollable_frame, text="Selected Practical Graph File:", font=ctk.CTkFont(size=12))
+        practical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
+
+        # Entry to display the selected practical graph file
+        self.practical_graph_var = ctk.StringVar(value=self.practical_graph_file)
+        self.practical_graph_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.practical_graph_var, state="readonly", font=ctk.CTkFont(size=12))
+        self.practical_graph_entry.pack(fill="x", padx=10, pady=5)
+
+        # Button to select practical graph file
+        select_practical_graph_button = ctk.CTkButton(
+            scrollable_frame,
+            text="Select Practical Graph File",
+            command=self.select_practical_graph_file
+        )
+        select_practical_graph_button.pack(padx=10, pady=5, anchor="w")
+
+        # Label for the selected theorical graph file
+        theorical_graph_label = ctk.CTkLabel(scrollable_frame, text="Selected Theoretical Graph File:", font=ctk.CTkFont(size=12))
+        theorical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
+
+        # Entry to display the selected theorical graph file
+        self.theorical_graph_var = ctk.StringVar(value=self.theorical_graph_file)
+        self.theorical_graph_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.theorical_graph_var, state="readonly", font=ctk.CTkFont(size=12))
+        self.theorical_graph_entry.pack(fill="x", padx=10, pady=5)
+
+        # Button to select theorical graph file
+        select_theorical_graph_button = ctk.CTkButton(
+            scrollable_frame,
+            text="Select Theoretical Graph File",
+            command=self.select_theorical_graph_file
+        )
+        select_theorical_graph_button.pack(padx=10, pady=5, anchor="w")
 
         # Run tests button
-        run_button = ctk.CTkButton(test_runner_tab, text="Run Tests", command=self.run_tests)
-        run_button.pack(pady=10)
+        run_button = ctk.CTkButton(scrollable_frame, text="Run Tests", command=self.run_tests)
+        run_button.pack(fill="x", padx=10, pady=5)
+
         # Compare button
-        compare_button = ctk.CTkButton(test_runner_tab, text="Compare Results", command=self.compare)
-        compare_button.pack(pady=10)
+        compare_button = ctk.CTkButton(scrollable_frame, text="Compare Graphs", command=self.compare)
+        compare_button.pack(fill="x", padx=10, pady=5)
+
+    def select_tests_dir(self):
+        directory_path = filedialog.askdirectory(
+            title="Select Tests Directory"
+        )
+        if directory_path:
+            self.tests_dir = directory_path
+            self.tests_dir_var.set(self.tests_dir)
+            print(f"Selected tests directory: {self.tests_dir}")
+            self.test_classes = self.get_test_classes()
+            self.populate_test_list()
+            self.reload_test_tabs()
+
+    def reload_test_tabs(self):
+        for i in reversed(range(self.tab_control.index("end"))):
+            tab_text = self.tab_control.tab(i, "text")
+            if tab_text not in self.tabs_to_keep:
+                self.tab_control.forget(i)
+        # Add new tests
+        for test_class_name, test_class_ref in self.test_classes:
+            self.add_test_tab(test_class_name, test_class_ref)
 
     """
         Populate the test list with checkboxes for each test class found in the specified directory
@@ -1009,7 +1126,6 @@ class App(ctk.CTk):
             widget.destroy()
 
         # Add each test as a checkbox
-        self.test_checkboxes = {}
         for test_class_name, test_class_ref in self.test_classes:
             var = ctk.BooleanVar(value=False)
             checkbox = ctk.CTkCheckBox(self.test_list_frame, text=test_class_name, variable=var)
@@ -1025,12 +1141,34 @@ class App(ctk.CTk):
         )
         if directory_path:
             self.images_dir = directory_path
+            self.images_dir_var.set(self.images_dir)
             print(f"Selected images directory: {self.images_dir}")
 
-            self.images_dir_entry.configure(state="normal")
-            self.images_dir_entry.delete(0, "end")
-            self.images_dir_entry.insert(0, self.images_dir)
-            self.images_dir_entry.configure(state="readonly")
+    """
+        Select the theorical graph file using a file dialog and update the entry field with the selected path
+    """
+    def select_practical_graph_file(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Practical Graph File",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        if file_path:
+            self.practical_graph_file = file_path
+            self.practical_graph_var.set(self.practical_graph_file)
+            print(f"[INFO] Practical graph file set to: {file_path}")
+
+    """
+        Select the theorical graph file using a file dialog and update the entry field with the selected path
+    """
+    def select_theorical_graph_file(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Theoretical Graph File",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        if file_path:
+            self.theorical_graph_file = file_path
+            self.theorical_graph_var.set(self.theorical_graph_file)
+            print(f"[INFO] Theoretical graph file set to: {file_path}")
 
     """
         Generate the graph from the selected executable calling the Jython script
@@ -1050,9 +1188,7 @@ class App(ctk.CTk):
         # else, run tests from the GUI
         selected_test_classes = []
 
-        print("Hola...")
-
-        if self.headless:
+        if self.headless and self.test_classes is not None:
             available_test_classes = {name: ref for name, ref in self.test_classes}
             for test_name in self.tests_to_run:
                 if test_name in available_test_classes:
@@ -1060,19 +1196,14 @@ class App(ctk.CTk):
                 else:
                     print(f"[ERROR] Test class '{test_name}' not found in available test classes.")
         else:
-            selected_test_class_names = [
-                test_class_name for test_class_name, (var, _) in self.test_checkboxes.items() if var.get()
+            selected_test_classes = [
+                test_class_ref for test_class_name, (var, test_class_ref) in self.test_checkboxes.items() if var.get()
             ]
 
-        if not selected_test_class_names:
-            print("[INFO] No tests selected")
-            self.compare()
-            return
-        
-        if self.generate_graph:
-            self.check_jython_thread(selected_test_class_names)
+        if selected_test_classes:
+            self.execute_selected_tests(selected_test_classes)
         else:
-            self.execute_selected_tests(selected_test_class_names)
+            print("[ERROR] No tests selected.")
 
     """
         Run the Jython script to generate the graph
@@ -1080,7 +1211,7 @@ class App(ctk.CTk):
     def run_jython(self):
         def execute_command():
             try:
-                self.command = [
+                command = [
                     self.java_path,
                     "-cp",
                     f"{self.jython_jar};{self.sikulix_jar}",
@@ -1089,94 +1220,81 @@ class App(ctk.CTk):
                     "--images_dir", self.images_dir,
                     "--practical_graph_file", self.practical_graph_file,
                     "--selected_executable", self.selected_executable,
-                    "--delay", self.executable_delay
+                    "--delay", str(self.executable_delay),
+                    "--timeout", str(self.timeout),
+                    "--initial_similarity", str(self.initial_similarity),
+                    "--min_similarity", str(self.min_similarity),
+                    "--similarity_step", str(self.similarity_step)
                 ]
-                if any(arg is None for arg in self.command):
-                    raise ValueError("[ERROR] One or more arguments in the Jython command are None.")
-                print("[INFO] Running Jython script: " + " ".join(self.command) + "\n")
-
-                with subprocess.Popen(
-                    self.command,
+                print("[INFO] Running Jython script: " + " ".join(command))
+                process = subprocess.Popen(
+                    command,
                     stdout=sys.__stdout__,
                     stderr=sys.__stderr__,
                     text=True,
                     shell=True
-                ) as process:
-                    while process.poll() is None:
-                        if self.stop_event.is_set():
-                            process.terminate()
-                            print("[INFO] Jython script terminated.")
-                            return
-                        threading.Event().wait(0.1)
-
+                )
+                self.jython_process = process
+                process.wait()  # Espera solo dentro del subhilo, no bloquea la GUI
+                print("[INFO] Jython script finished.")
             except Exception as e:
-                print("[ERROR] Failed to run Jython script: " + str(e) + "\n")
+                print("[ERROR] Failed to run Jython script: " + str(e))
             finally:
                 self.jython_process = None
 
         self.jython_thread = threading.Thread(target=execute_command, daemon=True)
         self.jython_thread.start()
 
-    def check_jython_thread(self, selected_test_classes):
-        
-        def _check():
-            if self.jython_thread.is_alive():
-                try:
-                    if hasattr(self, "tk") and self.tk is not None:
-                        after_id = self.after(1000, _check)
-                        if hasattr(self, "after_ids"):
-                            self.after_ids.append(after_id)
-                    else:
-                        raise RuntimeError("Tkinter not initalized")
-                except Exception as e:
-                    threading.Timer(1.0, _check).start()
-            else:
-                print("[INFO] Jython thread finished.")
-                self.execute_selected_tests(selected_test_classes)
-
-        _check()
-
     """
         Execute the selected tests
     """
     def execute_selected_tests(self, selected_test_classes):
-        # Erasing the test solution file.
-        open(self.test_solution_file, "w").close()
-        print("[INFO] Erasing test solution file...")
-
         file_path = os.path.abspath(self.practical_graph_file)
-        graph = self.graph_io.load_graph(file_path, self.images_dir)
-        for test_class_name in selected_test_classes:
+        self.generated_graph = self.graph_io.load_graph(file_path, self.images_dir)
+        if self.generated_graph is None:
+            print("[ERROR] No generated graph found. Please generate the graph first or select correctly.")
+            return
 
-            test_instance = self.test_instances[test_class_name]
-            test_instance.graph = graph  
-            test_instance.graph_file = self.test_solution_file
-
+        test_instances = []
+        for test_class_ref in selected_test_classes:
+            test_instance = test_class_ref(self.generated_graph, self.solution_file)
+            test_class_name = getattr(test_instance, "name", test_class_ref.__name__)
+            test_instance.set_update_callback(lambda attr_name, content, tcn=test_class_name: self.update_test_output(tcn, attr_name, content))
             test_instance.run()
-            test_instance.write_solution()
-        
-        # Directly compare the generated graph with the expected graph.
-        if self.headless:
-            self.compare()
+            test_instances.append((test_class_name, test_instance))
 
     """
         Compare the generated graph with specified graph
     """
-
     def compare(self):
         file_path = os.path.abspath(self.practical_graph_file)
-        generated_graph = self.graph_io.load_graph(file_path, self.images_dir)
-        print("Comparing results...")
+        # Check if the graph is already loaded
+        if self.generated_graph is None:
+            self.generated_graph = self.graph_io.load_graph(file_path, self.images_dir)
+        if self.generated_graph is None:
+            print("[ERROR] No generated graph found. Please generate the graph first or select correctly.")
+            return
+        # Check if the given graph is already loaded
+        if not self.graph or not hasattr(self.graph, "nodes") or not self.graph.nodes:
+            self.load_graph_from_file(self.theorical_graph_file)
+        if not self.graph or not hasattr(self.graph, "nodes") or not self.graph.nodes:
+            print("[ERROR] No given graph found. Please load the given graph first or generate it and save it.")
+            return
+        print("[INFO] Comparing results...")
         differences_found = 0
-        with open(self.test_solution_file, "a") as f:
-            print("[INFO] Comparing generated graph with given graph...")
-            f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
-            differences_found += self.compare_aux(generated_graph, self.graph, f)
-            print("[INFO] Comparing given graph with generated graph...")
-            f.write("[COMPARING GIVEN GRAPH vs GENERATED GRAPH]\n")
-            differences_found += self.compare_aux(self.graph, generated_graph, f)
-            if differences_found == 0:
-                f.write("[NO DIFFERENCES FOUND]\n")
+        try:
+            with open(self.solution_file, "a") as f:
+                print("[INFO] Comparing generated graph with given graph...")
+                f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
+                differences_found += self.compare_aux(self.generated_graph, self.graph, f)
+                print("[INFO] Comparing given graph with generated graph...")
+                f.write("[COMPARING GIVEN GRAPH vs GENERATED GRAPH]\n")
+                differences_found += self.compare_aux(self.graph, self.generated_graph, f)
+                if differences_found == 0:
+                    f.write("[NO DIFFERENCES FOUND]\n")
+            print("[INFO] Comparison finished. No differences found." if differences_found == 0 else f"[INFO] Comparison finished. {differences_found} differences found.")
+        except Exception as e:
+            print(f"[ERROR] Exception during comparison: {e}")
 
     def compare_aux(self, graph1:Graph, graph2:Graph, file_output):
         differences_found = 0
@@ -1209,26 +1327,101 @@ class App(ctk.CTk):
                     file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + "\n")
                     differences_found += 1
         return differences_found
-    """
-        Adds a test to the list of tests to be executed
-    """
-    def add_test_to_Execute(self, test):
-        if test not in self.test_to_execute:
-            self.test_to_execute.append(test)
-            
-    def add_tests_to_Execute(self, tests_list):
-        self.test_to_execute = tests_list
-    
-    """
-        Execute all tests in the graph.
-    """
-    def execute_tests(self):
-        for test in self.test_to_execute:
-            if isinstance(test, Test):
-                test.run()
-                test.write_solution(self.file_output)
-            else:
-                print(f"Test {test} is not a valid Test instance.")
+
+    # ==============================================================================================
+    # SETTINGS TAB
+    # ==============================================================================================
+    def add_settings_tab(self):
+        settings_tab = ctk.CTkFrame(self.tab_control)
+        self.tab_control.add(settings_tab, text="Settings")
+
+        # Java Path
+        java_label = ctk.CTkLabel(settings_tab, text="Java Path:", font=ctk.CTkFont(size=12))
+        java_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.java_path_var = ctk.StringVar(value=self.java_path if self.java_path else "java")
+        java_entry = ctk.CTkEntry(settings_tab, textvariable=self.java_path_var, width=400)
+        java_entry.pack(fill="x", padx=10, pady=2)
+        java_button = ctk.CTkButton(settings_tab, text="Select Java Executable", command=self.select_java_path)
+        java_button.pack(padx=10, pady=5, anchor="w")
+
+        # SikuliX Path
+        sikulix_label = ctk.CTkLabel(settings_tab, text="SikuliX API Jar Path:", font=ctk.CTkFont(size=12))
+        sikulix_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.sikulix_jar_var = ctk.StringVar(value=self.sikulix_jar)
+        sikulix_entry = ctk.CTkEntry(settings_tab, textvariable=self.sikulix_jar_var, width=400)
+        sikulix_entry.pack(fill="x", padx=10, pady=2)
+        sikulix_button = ctk.CTkButton(settings_tab, text="Select SikuliX Jar", command=self.select_sikulix_jar)
+        sikulix_button.pack(padx=10, pady=5, anchor="w")
+
+        # Jython Path
+        jython_label = ctk.CTkLabel(settings_tab, text="Jython Jar Path:", font=ctk.CTkFont(size=12))
+        jython_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.jython_jar_var = ctk.StringVar(value=self.jython_jar)
+        jython_entry = ctk.CTkEntry(settings_tab, textvariable=self.jython_jar_var, width=400)
+        jython_entry.pack(fill="x", padx=10, pady=2)
+        jython_button = ctk.CTkButton(settings_tab, text="Select Jython Jar", command=self.select_jython_jar)
+        jython_button.pack(padx=10, pady=5, anchor="w")
+
+        # Name of the solution file
+        solution_label = ctk.CTkLabel(settings_tab, text="Solution File:", font=ctk.CTkFont(size=12))
+        solution_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.solution_var = ctk.StringVar(value=self.solution_file if self.solution_file else "")
+        self.solution_entry = ctk.CTkEntry(settings_tab, textvariable=self.solution_var, width=400)
+        self.solution_entry.pack(fill="x", padx=10, pady=2)
+        def on_solution_change(*args):
+            self.solution_file = self.solution_var.get()
+        self.solution_var.trace_add("write", lambda *args: on_solution_change())
+
+        # Name of the practical graph file
+        practical_graph_label = ctk.CTkLabel(settings_tab, text="Practical Graph File:", font=ctk.CTkFont(size=12))
+        practical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.practical_graph_var = ctk.StringVar(value=self.practical_graph_file if self.practical_graph_file else "")
+        self.practical_graph_entry = ctk.CTkEntry(settings_tab, textvariable=self.practical_graph_var, width=400)
+        self.practical_graph_entry.pack(fill="x", padx=10, pady=2)
+        def on_practical_graph_change(*args):
+            self.practical_graph_file = self.practical_graph_var.get()
+        self.practical_graph_var.trace_add("write", lambda *args: on_practical_graph_change())
+
+        # Name of the theorical graph file
+        theorical_graph_label = ctk.CTkLabel(settings_tab, text="Theoretical Graph File:", font=ctk.CTkFont(size=12))
+        theorical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.theorical_graph_var = ctk.StringVar(value=self.theorical_graph_file if self.theorical_graph_file else "")
+        self.theorical_graph_entry = ctk.CTkEntry(settings_tab, textvariable=self.theorical_graph_var, width=400)
+        self.theorical_graph_entry.pack(fill="x", padx=10, pady=2)
+        def on_theorical_graph_change(*args):
+            self.theorical_graph_file = self.theorical_graph_var.get()
+        self.theorical_graph_var.trace_add("write", lambda *args: on_theorical_graph_change())
+
+
+    def select_java_path(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Java Executable",
+            filetypes=[("Java Executable", "java.exe;java"), ("All Files", "*.*")]
+        )
+        if file_path:
+            self.java_path_var.set(file_path)
+            self.java_path = file_path
+            print(f"[INFO] Java path set to: {file_path}")
+
+    def select_sikulix_jar(self):
+        file_path = filedialog.askopenfilename(
+            title="Select SikuliX API Jar",
+            filetypes=[("Jar Files", "*.jar"), ("All Files", "*.*")]
+        )
+        if file_path:
+            self.sikulix_jar_var.set(file_path)
+            self.sikulix_jar = file_path
+            print(f"[INFO] SikuliX jar path set to: {file_path}")
+
+    def select_jython_jar(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Jython Jar",
+            filetypes=[("Jar Files", "*.jar"), ("All Files", "*.*")]
+        )
+        if file_path:
+            self.jython_jar_var.set(file_path)
+            self.jython_jar = file_path
+            print(f"[INFO] Jython jar path set to: {file_path}")
 
     # ==============================================================================================
     # TERMINAL TAB
@@ -1244,8 +1437,9 @@ class App(ctk.CTk):
         self.terminal_output = ScrolledText(terminal_tab, wrap="word", state="disabled", height=20)
         self.terminal_output.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Redirect stdout to the terminal output
+        # Redirect stdout and stderr to the terminal output
         sys.stdout = self.TextRedirector(self.terminal_output)
+        sys.stderr = self.TextRedirector(self.terminal_output)
 
     """
         Restore the original stdout when the application is closed

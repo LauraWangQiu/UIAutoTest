@@ -6,14 +6,11 @@ class PrimePathCovTest(Test):
         self.prime_paths = set()
         self._update_callback = None
 
-
     """
         Overrides the parent run method
     """
     def run(self):
         print("Running " + self.name + ".")
-        self.prime_paths.clear()
-        
         all_paths = []
 
         # Get all the paths
@@ -32,17 +29,9 @@ class PrimePathCovTest(Test):
             if prime:
                 self.prime_paths.add(tuple(referencePath))
 
-        
-        content = "".join(" → ".join(node.name for node in path) for path in self.prime_paths)
+        content = "\n".join(" → ".join(node.name for node in path) for path in self.prime_paths)
         self.notify_update("prime_paths", content)
         self.write_solution()
-    
-    def set_update_callback(self, callback):
-        self._update_callback = callback
-
-    def notify_update(self, attr_name, content):
-        if self._update_callback:
-            self._update_callback(attr_name, content)
         
     # DFS method to get all the paths.
     def dfs(self, current, visited, path, all_paths):

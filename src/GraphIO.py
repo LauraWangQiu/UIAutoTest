@@ -39,9 +39,14 @@ class GraphIO:
         Returns:
             Graph: A Graph object populated with nodes and transitions
         """
-        self.graph = Graph()  # Create a new Graph instance
+        self.graph = None
         print("[INFO] Loading graph from " + graph_file)
         try:
+            if not os.path.isfile(graph_file):
+                print("[ERROR] Graph file not found: " + graph_file)
+                return None
+        
+            self.graph = Graph()  # Create a new Graph instance
             with open(graph_file, "r") as f:
                 for line in f:
                     line = line.strip()
@@ -106,7 +111,7 @@ class GraphIO:
         except Exception as e:
             print("[ERROR] An error occurred while loading the graph: " + str(e))
 
-        if self.graph.nodes:
+        if self.graph is not None and self.graph.nodes:
             first_node = next(iter(self.graph.nodes))
             self.graph.set_start_node(first_node)
 

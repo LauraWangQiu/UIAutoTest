@@ -25,3 +25,16 @@ class Test:
     """
     def write_solution(self):
         pass
+    
+    """
+        Method to update the callback.
+    """
+    def set_update_callback(self, callback):
+        self._update_callback = callback
+
+    """
+        Method to notify the update of the test.
+    """
+    def notify_update(self, attr_name, content):
+        if self._update_callback:
+            self._update_callback(attr_name, content)

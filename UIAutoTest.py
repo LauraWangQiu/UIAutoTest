@@ -39,7 +39,6 @@ if __name__ == "__main__":
     java_path =             config.get("java_path", "java")
     jython_jar =            config.get("jython_jar", "jython-standalone-2.7.4.jar")
     sikulix_jar =           config.get("sikulix_jar", "sikulixapi-2.0.5.jar")
-    sikuli_script =         config.get("sikuli_script", "src/generateGraph.py")
     images_dir =            config.get("images_dir", "imgs")
     tests_dir =             config.get("tests_dir", "tests")
     theorical_graph_file =  config.get("theorical_graph_file", "graph.txt")
@@ -47,8 +46,12 @@ if __name__ == "__main__":
     generate_graph =        config.get("generate_graph", True)
     selected_executable =   config.get("selected_executable", None)
     executable_delay =      config.get("executable_delay", "5")
+    timeout =               config.get("timeout", 2)
+    initial_similarity =    config.get("initial_similarity", 0.99)
+    min_similarity =        config.get("min_similarity", 0.85)
+    similarity_step =       config.get("similarity_step", 0.01)
     tests_to_run =          config.get("tests_to_run", [])
-    test_solution_file =    config.get("test_solution_file", "test_solution.txt")
+    solution_file =         config.get("solution_file", "solution.txt")
 
     headless = True if config_file else False
     
@@ -56,7 +59,7 @@ if __name__ == "__main__":
         java_path=java_path,
         jython_jar=jython_jar,
         sikulix_jar=sikulix_jar,
-        sikuli_script=sikuli_script,
+        sikuli_script="src/generateGraph.py",
         window_name="UIAutoTest",
         window_size="800x600",
         images_dir=images_dir,
@@ -66,7 +69,11 @@ if __name__ == "__main__":
         generate_graph=generate_graph,
         selected_executable=selected_executable,
         executable_delay=executable_delay,
+        timeout=timeout,
+        initial_similarity=initial_similarity,
+        min_similarity=min_similarity,
+        similarity_step=similarity_step,
         tests_to_run=tests_to_run,
-        test_solution_file=test_solution_file,
+        solution_file=solution_file,
         headless=headless
     )

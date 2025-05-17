@@ -7,33 +7,22 @@ class TotalConnectTest(Test):
         self.visited_transitions = set()
         self._update_callback = None
 
-
     """
         Overrides the parent run method
     """
     def run(self):
         print("Running " + self.name + ".")
-        self.visited_states.clear()
-        self.visited_transitions.clear()
-
         for node in self.graph.nodes:
             self.visited_states.add(node)
             for transition in node.transitions:
                 self.visited_transitions.add((node.name,transition.destination.name))
                 self.visited_states.add(transition.destination)
 
-        content = "".join(node.name for node in self.visited_states)
+        content = "\n".join(node.name for node in self.visited_states)
         self.notify_update("visited_states", content)
-        content = "\n".join(f"{origin}' → '{dest}'" for origin, dest in self.visited_transitions)
+        content = "\n".join(f"{origin} → {dest}" for origin, dest in self.visited_transitions)
         self.notify_update("visited_transitions", content)
         self.write_solution()
-
-    def set_update_callback(self, callback):
-        self._update_callback = callback
-
-    def notify_update(self, attr_name, content):
-        if self._update_callback:
-            self._update_callback(attr_name, content)
 
     """
         Overrides the parent write_solution method
@@ -54,9 +43,9 @@ class TotalConnectTest(Test):
                 aux = 0
                 for node in self.graph.nodes:
                     for transition in node.transitions:
-                        if transition not in self.visited_transitions:
+                        if (node.name, transition.destination.name) not in self.visited_transitions:
                             aux += 1
-                            file.write("[TRANSITION NOT VISITED] " + node.name + "-" + transition.destination + "\n")
+                            file.write("[TRANSITION NOT VISITED] " + node.name + "-" + transition.destination.name + "\n")
                 if aux == 0:
                     file.write("There are not non-visited transitions\n")
 

@@ -15,7 +15,7 @@ GraphIO = _graph_io_module.GraphIO
 class GenerateGraph:
     valid_extensions = {'.png', '.jpg', '.jpeg', '.bmp'}
 
-    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5):
+    def __init__(self, images_dir=None, practical_graph_file=None, selected_executable=None, delay=5, timeout=2, initial_similarity=0.99, min_similarity=0.85, similarity_step=0.01):
         self.images_dir = images_dir
         self.practical_graph_file = practical_graph_file
         self.selected_executable = selected_executable
@@ -26,7 +26,7 @@ class GenerateGraph:
         }
         self.lastInput = None
         self.full_images_dir = os.path.join(os.getcwd(), self.images_dir)
-        self.graph = Graph()
+        self.graph = None
         self.delay = delay
         self.process = None
         self.sikuli = SikulixWrapper()        
@@ -39,9 +39,13 @@ class GenerateGraph:
         self.default_state_name = "State_"
         self.debug_name = "Debug"
         self.full_debug_name = os.path.join(self.full_images_dir, self.debug_name)
+        self.initial_similarity = initial_similarity
+        self.min_similarity = min_similarity
+        self.similarity_step = similarity_step
+        self.timeout = timeout
         
     def generate_graph(self):
-        print("Generating graph for " + str(self.selected_executable))
+        print("[INFO] Generating graph for " + str(self.selected_executable))
         self._executable_thread = threading.Thread()
         self._executable_thread.start()
 
@@ -52,6 +56,10 @@ class GenerateGraph:
         self._executable_thread.join()
 
         self._stop_executable()
+        if self.graph is None:
+            print("[ERROR] No graph generated.")
+            return
+        
         for node in self.graph.nodes:
             print("[INFO] Node: " + str(node.name))
             for transition in node.transitions:
@@ -93,34 +101,32 @@ class GenerateGraph:
 
     # --- DFS recursivo ---
     def _loop(self):
-        print("[LOOP] Starting DFS graph generation loop...")
-        # Check if the images directory exists
+        # Check if the images directory exists and is a directory
+        if not os.path.isdir(self.full_images_dir):
+            print("[LOOP] Images directory does not exist or is not a directory: " + self.full_images_dir)
+            return
         state_folders = [os.path.join(self.full_images_dir, d) for d in os.listdir(self.full_images_dir) if os.path.isdir(os.path.join(self.full_images_dir, d))]
         if not state_folders:
             print("[LOOP] No states found.")
             return
         if not os.path.exists(self.full_debug_name):
-                os.makedirs(self.full_debug_name)
-
+            os.makedirs(self.full_debug_name)
+        print("[LOOP] Starting DFS graph generation loop...")
         self._ensure_executable_running()
+        self.graph = Graph()
         self.graph.set_start_node(self._dfs_state())
         print("[LOOP] DFS graph loop finished.")
         self._stop_executable()
         self._stop_loop.set()
 
     def _dfs_state(self):
-        initial_similarity = 0.99
-        min_similarity = 0.85
-        similarity_step = 0.01
-        timeout = 2
-
         current_state = None        # Node object
         current_state_path = None   # Path to the image of the current state
         current_state_name = None   # Name of the current state
 
         # Check if current state exists
-        similarity = initial_similarity
-        while similarity >= min_similarity and current_state is None:
+        similarity = self.initial_similarity
+        while similarity >= self.min_similarity and current_state is None:
             print("[DFS] Searching for current state with similarity: " + str(similarity))
             for candidate_state in os.listdir(self.full_images_dir):
                 candidate_path = os.path.join(self.full_images_dir, candidate_state)
@@ -136,7 +142,7 @@ class GenerateGraph:
                 # There must be at least one image and the first one selected is the main state image
                 candidate_state_path = os.path.join(candidate_path, candidate_states[0])
                 print("[DFS] Checking if the screen matches: " + str(candidate_state_path))
-                if self.sikuli.search_image_once(candidate_state_path, similarity=similarity, timeout=timeout):
+                if self.sikuli.search_image_once(candidate_state_path, similarity=similarity, timeout=self.timeout):
                     # Create node in graph
                     current_state_path = candidate_path
                     current_state_name = candidate_state
@@ -144,7 +150,7 @@ class GenerateGraph:
                     print("[DFS] The screen matches with state: " + str(current_state_name))
                     break
                     
-            similarity -= similarity_step
+            similarity -= self.similarity_step
 
         if current_state is not None:
             found = False
@@ -187,9 +193,6 @@ class GenerateGraph:
                         for idx, btn in enumerate(buttons_input_path_names):
                             btn_path = os.path.join(buttons_input_path, btn)
                             print("[DFS] Simulating " + action_type + " with button image: " + str(btn_path))
-                            if self.lastInput is not None and len(self.inputs[self.lastInput]) >= 1:
-                                print ("Desde ruta: "  + str(self.inputs[self.lastInput]))
-                            print(current_state_name + " Nombreeeeeeeeeeeeeeeeeeeeeeeeeee")
                             self.lastInput = action_type
                             self.sikuli.capture_error(btn, self.full_debug_name)
                             result = self.do_action(action_type, btn_path)
@@ -206,8 +209,6 @@ class GenerateGraph:
                             transition.update_action(action_type)
                             transition.update_image(btn_path)
                         
-                #self._restart_executable_and_continue()
-            
             self._restart_executable_and_continue()
 
         else:
@@ -260,16 +261,14 @@ class GenerateGraph:
 
     def _restart_executable_and_continue(self):
         self._stop_executable()
-        
-        if self.lastInput is None  or not self.inputs.get(self.lastInput):
-            print("[INFO] AAAAAAA.")
+        if not self.lastInput or not self.inputs.get(self.lastInput):
             return
-        
-        self.inputs[self.lastInput].pop()
-        
+        if self.inputs[self.lastInput]:
+            self.inputs[self.lastInput].pop()
+        if not self.inputs[self.lastInput]:
+            return
         self._ensure_executable_running()
         self.navigate_to_state(self.inputs[self.lastInput])
-        
 
     def add_inputs_to_path(self, btn_path):
         self.inputs[self.lastInput].append(btn_path)
@@ -328,18 +327,21 @@ if __name__ == "__main__":
     parser.add_argument("--practical_graph_file", required=True, help="Name of the practical graph file to save.")
     parser.add_argument("--selected_executable", required=True, help="Path to the executable to run.")
     parser.add_argument("--delay", type=int, default=5, help="Delay in seconds between actions.")
+    parser.add_argument("--timeout", type=int, default=2, help="Timeout in seconds for image matching.")
+    parser.add_argument("--initial_similarity", type=float, default=0.99, help="Initial similarity for image matching.")
+    parser.add_argument("--min_similarity", type=float, default=0.85, help="Minimum similarity for image matching.")
+    parser.add_argument("--similarity_step", type=float, default=0.01, help="Similarity step for image matching.")
 
     args = parser.parse_args()
-
-    print("[INFO] Images directory: " + str(args.images_dir))
-    print("[INFO] Practical graph file: " + str(args.practical_graph_file))
-    print("[INFO] Selected executable: " + str(args.selected_executable))
-    print("[INFO] Delay in seconds: " + str(args.delay))
 
     generator = GenerateGraph(
         images_dir=args.images_dir, 
         practical_graph_file=args.practical_graph_file, 
         selected_executable=args.selected_executable,
-        delay=args.delay
+        delay=args.delay,
+        timeout=args.timeout,
+        initial_similarity=args.initial_similarity,
+        min_similarity=args.min_similarity,
+        similarity_step=args.similarity_step
     )
     generator.generate_graph()

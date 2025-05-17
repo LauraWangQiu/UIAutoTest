@@ -190,17 +190,23 @@ class Graph:
         for node in self.nodes:
             if node.name == name:
                 return node
-        print("[ERROR] Node not found: " + name)
+        print("[ERROR] Node not found: " + str(name))
         return None
 
     """
         Returns the node with the given image.
     """
     def get_node_image(self, image):
+        if not self.nodes:
+            print("[ERROR] Graph has no nodes.")
+            return None
+        if image is None:
+            print("[ERROR] Image argument is None.")
+            return None
         for node in self.nodes:
             if node.image == image:
                 return node
-        print("[ERROR] Node not found: " + image)
+        print("[ERROR] Node not found: " + str(image))
         return None
 
     """
