@@ -95,7 +95,8 @@ class SikulixWrapper:
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
                 self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
-                self.capture_error(debug_image_name, debug_image_path, capture_last_match)
+                if capture_last_match:
+                    self.capture_error(debug_image_name, debug_image_path, capture_last_match)
                 self.screen.click(Pattern(image_path).similar(actual_similarity))
                 print("[OK] Clicked image.")
                 return True
@@ -124,7 +125,8 @@ class SikulixWrapper:
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
                 self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
-                self.capture_error(debug_image_name, debug_image_path, capture_last_match)
+                if capture_last_match:
+                    self.capture_error(debug_image_name, debug_image_path, capture_last_match)
                 self.screen.click(match)
                 if clear_before:
                     self.screen.type("a", KeyModifier.CTRL)  # Select all

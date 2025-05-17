@@ -286,11 +286,11 @@ class GenerateGraph:
         result = False
         if action_type == ActionType.CLICK:
             print("[INFO] Clicking on: " + str(btn_path))
-            result = self.sikuli.click_image(btn_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction)
+            result = self.sikuli.click_image(btn_path, similarity = similarity, timeout = timeout, retries = retries, similarity_reduction = similarity_reduction, capture_last_match = True, debug_image_name = os.path.basename(btn_path), debug_image_path = self.debug_name)
         elif action_type == ActionType.DOUBLE_CLICK:
             print("[INFO] Double clicking on: " + str(btn_path))
             return False
-            # self.sikuli.double_click_image(btn_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction)
+            # self.sikuli.double_click_image(btn_path, similarity=similarity, timeout=timeout, retries=retries, similarity_reduction=similarity_reduction, capture_last_match = True)
         elif action_type == ActionType.CLICK_AND_TYPE:
             if text is None:
                 print("[ERROR] No text provided for click and type.")
@@ -325,7 +325,7 @@ class GenerateGraph:
         print("[NAVIGATE] Replaying the click sequence: " + str(clicks_path))
         for idx, btn_path in enumerate(clicks_path):
             print("[NAVIGATE] (" + str(idx+1) + "/" + str(len(clicks_path)) + ") Clicking on: " + str(btn_path))
-            self.sikuli.click_image(btn_path, timeout=timeout, retries=8, similarity_reduction=0.05)
+            self.sikuli.click_image(btn_path, timeout=timeout, retries = 8, similarity_reduction = 0.05)
             time.sleep(self.delay)
         print("[NAVIGATE] Click sequence completed.")
 
