@@ -8,11 +8,15 @@
     "practical_graph_file": "output_graph.txt",
     "generate_graph": true,
     "selected_executable": "bin/Sample/My project.exe",
-    "executable_delay": "5",
+    "executable_delay": "3",
+    "debug_images": true,
     "timeout": "2",
     "initial_similarity": "0.99",
     "min_similarity": "0.85",
     "similarity_step": "0.01",
+    "retries": "8",
+    "state_reset_method": "relaunch",
+    "internal_reset_script": "reset.bat",
     "tests_to_run": ["EdgePairCovTest", "PrimePathCovTest", "SelfLoopTest", "TotalConnectTest"],
     "solution_file": "solution.txt"
 }

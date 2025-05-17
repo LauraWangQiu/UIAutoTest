@@ -87,11 +87,11 @@ class GraphIO:
                                 self.handle_double_click_action(src_node, tgt_node, os.path.join(img_dir, img))
 
                         elif action == ActionType.CLICK_AND_TYPE:
-                            if len(parts) != 5:
-                                print("[ERROR] Invalid number of args for CLICK_AND_TYPE, expected 5 but got " + str(len(parts)))
+                            if len(parts) != 6:
+                                print("[ERROR] Invalid number of args for CLICK_AND_TYPE, expected 6 but got " + str(len(parts)))
                                 continue
-                            img = parts[3]
-                            text = parts[4]
+                            img = parts[4]
+                            text = parts[5]
                             self.handle_click_and_type_action(src_node, tgt_node, text, os.path.join(img_dir, img))
 
                         elif action == ActionType.DRAG_AND_DROP:
