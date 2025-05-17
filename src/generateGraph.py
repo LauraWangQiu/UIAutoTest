@@ -37,8 +37,8 @@ class GenerateGraph:
         self.phantom_state_counter = 0
         self.buttons_dir = "buttons"
         self.default_state_name = "State_"
-        self.debug_name = "Debug"
-        self.full_debug_name = os.path.join(self.full_images_dir, self.debug_name)
+        self.debug_name = "DebugImages"
+        self.full_debug_name = os.path.join(os.getcwd(), self.debug_name)
         self.initial_similarity = initial_similarity
         self.min_similarity = min_similarity
         self.similarity_step = similarity_step
