@@ -29,6 +29,7 @@ def singleton(cls):
 class SikulixWrapper:
     def __init__(self):
         self.screen = Screen()
+        self.last_match_region = None
 
     """
     Attempt to locate the given image on screen several times.
@@ -48,6 +49,7 @@ class SikulixWrapper:
             print("Attempts " + str(actual_attempt) + "/" + str(retries))
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
+                self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
                 print("[OK] Image found.")
                 return True
             else:
@@ -91,6 +93,7 @@ class SikulixWrapper:
             print("Attempts " + str(actual_attempt) + "/" + str(retries))
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
+                self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
                 self.screen.click(Pattern(image_path).similar(actual_similarity))
                 print("[OK] Clicked image.")
                 return True
@@ -166,13 +169,24 @@ class SikulixWrapper:
         :param folder: Directory in which to save the screenshot.
         :return: File path if successful; None on failure.
     """
-    def capture_error(self, filename, folder="."):
+    def capture_error(self, filename, folder=".", region= None):
         try:
-            filepath = self.screen.capture().save(folder, filename)
+            from org.sikuli.script import Region            
+            if region:
+                x, y, w, h = region
+                reg = Region(int(x), int(y), int(w), int(h))
+                filepath = self.screen.capture(reg).save(folder, filename)
+            #if capture_last_match and self.last_match_region:
+            #    print("[INFO] Capturing last match region.")
+            #    x, y, w, h = self.last_match_region
+            #    reg = Region(int(x), int(y), int(w), int(h))
+            #    filepath = self.screen.capture(reg).save(folder, filename)
+            else:
+                filepath = self.screen.capture().save(folder, filename)
             print("[CAPTURE] Saved screenshot:" + filepath)
             return filepath
         except Exception as e:
-            print("[ERROR] Failed to save screenshot:" +e)
+            print("[ERROR] Failed to save screenshot:" + str(e))
             return None
     
     
