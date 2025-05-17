@@ -6,7 +6,7 @@ from org.python.core import PySystemState
 py_sys = PySystemState()
 py_sys.path.append("sikulixapi-2.0.5.jar")
 
-from org.sikuli.script import Screen, Pattern, Key, KeyModifier
+from org.sikuli.script import Screen, Pattern, Key, KeyModifier, Region
 
 """
 Decorator to turn a class into a Singleton.
@@ -41,7 +41,7 @@ class SikulixWrapper:
     :param similarity_reduction: Amount to reduce similarity per attempt.
     :return: True if the image was found; False otherwise.
     """
-    def search_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1):
+    def search_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, debug_image_name= "debug_image", debug_image_path=".", capture_last_match=False):
         print("[INFO] Searching for image: " + image_path)
         for attempt in range(retries):
             actual_attempt = attempt + 1
@@ -50,6 +50,7 @@ class SikulixWrapper:
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
                 self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
+                self.capture_error(debug_image_name, debug_image_path, capture_last_match)
                 print("[OK] Image found.")
                 return True
             else:
@@ -85,7 +86,7 @@ class SikulixWrapper:
         :param similarity_reduction: Amount to reduce similarity per attempt.
         :return: True if the click was successful; False otherwise.
     """
-    def click_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction = 0.1 ):
+    def click_image(self, image_path, similarity=1.0, timeout=2, retries=6, similarity_reduction = 0.1, debug_image_name= "debug_image", debug_image_path=".", capture_last_match=False):
         print("[INFO] Trying click on image: " + image_path)
         for attempt in range(retries):
             actual_attempt = attempt + 1
@@ -94,6 +95,7 @@ class SikulixWrapper:
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
                 self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
+                self.capture_error(debug_image_name, debug_image_path, capture_last_match)
                 self.screen.click(Pattern(image_path).similar(actual_similarity))
                 print("[OK] Clicked image.")
                 return True
@@ -114,13 +116,15 @@ class SikulixWrapper:
         :param clear_before: If True, clears the field before typing.
         :return: True if successful, False otherwise.
     """
-    def write_text(self, image_path, text, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, clear_before=False):
+    def write_text(self, image_path, text, similarity=1.0, timeout=2, retries=6, similarity_reduction=0.1, clear_before=False, debug_image_name= "debug_image", debug_image_path=".", capture_last_match=False):
         for attempt in range(retries):
             actual_similarity = similarity - (similarity_reduction * attempt)
             actual_attempt = attempt + 1
             print("Attempts " + str(actual_attempt) + "/" + str(retries))
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
+                self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
+                self.capture_error(debug_image_name, debug_image_path, capture_last_match)
                 self.screen.click(match)
                 if clear_before:
                     self.screen.type("a", KeyModifier.CTRL)  # Select all
@@ -169,18 +173,13 @@ class SikulixWrapper:
         :param folder: Directory in which to save the screenshot.
         :return: File path if successful; None on failure.
     """
-    def capture_error(self, filename, folder=".", region= None):
-        try:
-            from org.sikuli.script import Region            
-            if region:
-                x, y, w, h = region
+    def capture_error(self, filename, folder=".", capture_last_match= False):
+        try:          
+            if capture_last_match and self.last_match_region:
+                print("[INFO] Capturing last match region.")
+                x, y, w, h = self.last_match_region
                 reg = Region(int(x), int(y), int(w), int(h))
                 filepath = self.screen.capture(reg).save(folder, filename)
-            #if capture_last_match and self.last_match_region:
-            #    print("[INFO] Capturing last match region.")
-            #    x, y, w, h = self.last_match_region
-            #    reg = Region(int(x), int(y), int(w), int(h))
-            #    filepath = self.screen.capture(reg).save(folder, filename)
             else:
                 filepath = self.screen.capture().save(folder, filename)
             print("[CAPTURE] Saved screenshot:" + filepath)
