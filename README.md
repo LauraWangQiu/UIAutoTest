@@ -8,7 +8,15 @@
 > Francisco Miguel Galván Muñoz  
 > Yi (Laura) Wang Qiu  
 
-UI Automatization tests using [Sikulix](https://sikulix.github.io/docs/) and python scripts.
+UIAutoTest is a tool designed to verify the correct functioning of user menus using [Sikulix](https://sikulix.github.io/docs/) and python scripts. The main objective is to compare the navigation flow provided by the user with the actual flow obtained by automatically interacting with the executable. This comparison allows detecting functional errors without the need for repetitive manual testing each time a new version of the executable is generated.
+Both flows are represented by non-valued directed graphs, where each vertex represents a menu or screen and each edge represents a possible transition between menus, activated by an interface element (such as a button) and its corresponding input.
+
+The theoretical flow is defined by means of a .txt or graphical interface where the expected navigation structure is described (menus that appear, buttons contained in menus and what is their visual representation). At the same time the game is executed to obtain the real flow by generating the corresponding graph.
+
+The tool compares both graphs to identify differences between expected and actual behavior. It also includes a battery of additional tests that detect common problems such as unconnected nodes, auto edges, buttons that lead to an unidentifiable state or interface elements that do not appear or do not work. The tests included are: prime path coverage, autoedge coverage, edge pair coverage and full connectivity.
+The result of the analysis is presented in a .txt file and by means of a graphical interface that shows differences and the results of each test.
+
+![Interface](docs/interface.png)
 
 ## Prerequisites
 
