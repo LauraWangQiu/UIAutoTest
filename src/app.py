@@ -276,6 +276,9 @@ class App(ctk.CTk):
         if file_path:
             self.clear_graph()
             self.graph = self.graph_io.load_graph(file_path, self.images_dir)
+            if self.graph is None:
+                print("[ERROR] Graph not loaded.")
+                return
             self.node_frames_index = len(self.graph.nodes) + 1
             
             # Create frames for each node in the loaded graph
@@ -751,8 +754,11 @@ class App(ctk.CTk):
         Clear the entire graph and all nodes
     """
     def clear_graph(self):
+        if self.graph is None:
+            print("[INFO] No graph to clear")
+            return
+        
         self.graph.clear()
-
         for frame, edit_frame in self.node_frames:
             frame.destroy()
             if edit_frame:
