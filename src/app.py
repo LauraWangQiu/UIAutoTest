@@ -21,6 +21,8 @@ GraphIO = _graph_io_module.GraphIO
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.gridspec as gridspec
+
 
 class App(ctk.CTk):
     """
@@ -93,6 +95,7 @@ class App(ctk.CTk):
             'missing_edges_gen': set(),
             'missing_edges_the': set(),
         }
+        self.test_results = []
         
         self.test_checkboxes = {}
         self.test_output_widgets = {}
@@ -1307,6 +1310,7 @@ class App(ctk.CTk):
             test_instance.set_update_callback(lambda attr_name, content, tcn=test_class_name: self.update_test_output(tcn, attr_name, content))
             test_instance.run()
             test_instance.write_solution()
+            self.test_results.append(test_instance.get_results())
             test_instances.append((test_class_name, test_instance))
 
     """
@@ -1332,17 +1336,17 @@ class App(ctk.CTk):
             with open(self.solution_file, "a") as f:
                 print("[INFO] Comparing generated graph with given graph...")
                 f.write("[COMPARING GENERATED GRAPH vs GIVEN GRAPH]\n")
-                differences_found += self.compare_aux(f, self.generated_graph, self.graph, self.theorical_graph_file)
+                differences_found += self.compare_aux(f, self.generated_graph, self.graph, self.theorical_graph_file, "diff_in_gen")
                 print("[INFO] Comparing given graph with generated graph...")
                 f.write("[COMPARING GIVEN GRAPH vs GENERATED GRAPH]\n")
-                differences_found += self.compare_aux(f, self.graph, self.generated_graph, self.practical_graph_file)
+                differences_found += self.compare_aux(f, self.graph, self.generated_graph, self.practical_graph_file, "diff_in_the")
                 if differences_found == 0:
                     f.write("[NO DIFFERENCES FOUND]\n")
             print("[INFO] Comparison finished. No differences found." if differences_found == 0 else f"[INFO] Comparison finished. {differences_found} differences found.")
         except Exception as e:
             print(f"[ERROR] Exception during comparison: {e}")
 
-    def compare_aux(self, file_output, graph1:Graph, graph2:Graph, graph_file:str):
+    def compare_aux(self, file_output, graph1:Graph, graph2:Graph, graph_file:str, diff_in):
         differences_found = 0
         for node1 in graph1.nodes:
             print("[INFO] Comparing node: " + node1.name)
@@ -1350,7 +1354,7 @@ class App(ctk.CTk):
             if node2 is None: # Node is not in generated graph
                 print("[INFO] Node not found: " + node1.name)
                 file_output.write("[MISSING NODE] " + node1.name + " not in " + graph_file + "\n")
-                if graph_file == self.theorical_graph_file:
+                if diff_in == "diff_in_gen":
                     self.diff['missing_nodes_theo'].add(node1.name)
                 else:
                     self.diff['missing_nodes_prac'].add(node1.name)
@@ -1370,7 +1374,7 @@ class App(ctk.CTk):
                             # Writes the objetive destination and the real destination
                             file_output.write("[MISMATCH TRANSITION] Supposed: " + node1.name + " -/-> " + trans1.destination.name + " Real: " + node1.name +" -> " + trans2.destination.name + "\n")
                             self.diff['mismatch_trans'].append((node1.name, trans1.destination.name, trans2.destination.name, f"{graph1.name} vs {graph2.name}"))   
-                            if graph_file == self.theorical_graph_file:
+                            if diff_in == "diff_in_gen":
                                 self.diff['missing_edges_the'].add((node1.name, trans1.destination.name))                         
                             else:
                                 self.diff['missing_edges_gen'].add((node1.name, trans1.destination.name))
@@ -1380,6 +1384,10 @@ class App(ctk.CTk):
                 if not found:
                     print("[INFO] Transition not found: " + trans1.image)
                     file_output.write("[MISSING TRANSITION] " + node1.name + " -/-> " + trans1.destination.name + " " + trans1.image + "\n")
+                    if diff_in == "diff_in_gen":
+                        self.diff['missing_edges_the'].add((node1.name, trans1.destination.name))
+                    else:
+                        self.diff['missing_edges_gen'].add((node1.name, trans1.destination.name))
                     differences_found += 1
         return differences_found
 
@@ -1740,11 +1748,24 @@ class App(ctk.CTk):
     """ 
     def create_PDF(self, output_pdf_path: str):
         all_nodes = set()
-        for n in self.graph.nodes:
-            all_nodes.add(n.name)
+        for node in self.graph.nodes:
+            all_nodes.add(node.name)
         for n2 in self.generated_graph.nodes:
             all_nodes.add(n2.name)
 
+        
+        # Setting the grid of the document.
+        grid = plt.figure(figsize = (15, 15))       
+        gs  = gridspec.GridSpec(
+            nrows = (3 + len(self.test_results)), ncols = 3, # Grid (3+nTests)x3                 
+            height_ratios = ([0.05, 0.5, 0.05] + [0.1] * len(self.test_results)),
+            width_ratios = [0.2, 0.7, 0.2], 
+            hspace = 0.0, wspace = 0.0)
+        
+        
+        doc_graph = grid.add_subplot(gs[1, 1])
+        doc_graph.axis('off')
+        
         G = nx.DiGraph()
         # Set the colour of the nodes depending in where they are
         for name in all_nodes:
@@ -1771,44 +1792,104 @@ class App(ctk.CTk):
         # Set the transitions missing in theorical graph in green
         for (u, v) in self.diff['missing_edges_the']:
             G.add_edge(u, v, color = 'green', style = 'solid')
-
-        plt.figure(figsize = (12, 8))
+             
         pos = nx.spring_layout(G)
 
         # Draw the nodes
         node_colors = []
         for node in G.nodes():
             node_colors.append(G.nodes[node]['color'])
-        nx.draw_networkx_nodes(G, pos, node_size = 1500, node_color = node_colors)
+        nx.draw_networkx_nodes(G, pos, node_size = 1500, node_color = node_colors, ax = doc_graph)
 
         # Draw nodes names
-        nx.draw_networkx_labels(G, pos, font_size = 9, font_color='white')
+        nx.draw_networkx_labels(G, pos, font_size = 9, font_color = 'white', ax = doc_graph)
 
         # Draw the transitions
         for u, v, attr in G.edges(data=True):
             nx.draw_networkx_edges(
                 G, pos,
                 edgelist = [(u, v)],
-                style=attr['style'],
+                style = attr['style'],
                 edge_color = attr['color'],
                 arrowsize = 30,
-                width = 3
+                width = 3,
+                ax = doc_graph
             )
 
         # Caption of the document
-        black_node = mpatches.Patch(color = 'black', label = 'In boths graphs')
-        red_node   = mpatches.Patch(color = 'red',   label = 'Not in generated graph')
-        green_node = mpatches.Patch(color = 'green', label = 'Not in theorical graph')
+        black_caption = mpatches.Patch(color = 'black', label = 'In boths graphs')
+        red_caption   = mpatches.Patch(color = 'red',   label = 'Not in generated graph')
+        green_caption = mpatches.Patch(color = 'green', label = 'Not in theorical graph')
        
-        caption = [black_node, red_node, green_node]
-        plt.legend(handles = caption, loc = 'upper right', fontsize = 10, frameon = True, labelcolor = "orange")
+        doc_legend = grid.add_subplot(gs[0, 2])
+        doc_legend.axis('off')
+        caption = [black_caption, red_caption, green_caption]
+        doc_legend.legend(handles = caption, loc = 'upper right', fontsize = 15, frameon = True, labelcolor = "orange")
+        
+        doc_tittle = grid.add_subplot(gs[0, 0])
+        doc_tittle.axis('off')
+        doc_tittle.text(0.0, 0.8, "Difference between the theo_graph and the gen_graph:", fontsize = 20, va = 'top')
+        
+        # Test results:
+        doc_tests = grid.add_subplot(gs[2, 0])
+        doc_tests.axis('off')
+        doc_tests.text(0.0, 0.8, "Test results: ", fontsize = 20, va = 'top')
+        
+        for i in range(len(self.test_results)):
+            doc_test = grid.add_subplot(gs[3 + i, 0])
+            doc_test.axis('off')
+            test_type = str(self.test_results[i][0])
+            
+            doc_tests_result= grid.add_subplot(gs[3 + i, 1])
+            doc_tests_result.axis('off')
+            if test_type == "TCT":
+                doc_test.text(0.0, 0.8, "Total Coverage Test:", fontsize = 12, va = 'top')
+                nodes = self.test_results[i][1][0]
+                transitions = self.test_results[i][1][1]            
+                doc_tests_result.text(0.0, 0.8, "Visited nodes:  " + str(nodes) + "\nVisited transitions:  " + str(transitions), fontsize = 10, va = 'top')
+            elif test_type == "SLT":
+                 doc_test.text(0.0, 0.8, "Self Loop Test:", fontsize = 12, va = 'top')
+                 result = self.test_results[i][1]
+                 if len(result) == 0:
+                    doc_tests_result.text(0.0, 0.8, "No nodes with self loops found.", fontsize = 10, va = 'top')
+                 else:
+                    doc_tests_result.text(0.0, 0.8, "Nodes with self loops:  " + str(result), fontsize = 10, va = 'top')
+            elif test_type == "PPCT":
+                 doc_test.text(0.0, 0.8, "Prime Path Coverage Test:", fontsize = 12, va = 'top')
+                 result = self.test_results[i][1]
+                 if len(result) == 0:
+                    doc_tests_result.text(0.0, 0.8, "No prime paths found.", fontsize = 10, va = 'top')
+                 else:
+                    text = "\n".join(result[0])
+                    #text = "\n".join(result)
+                    doc_tests_result.text(0.0, 0.8, "Prime paths found:\n" + text, fontsize=10, va='top')
+            elif test_type == "EPCT":
+                 doc_test.text(0.0, 0.8, "Edge Pair Coverage Test:", fontsize = 12, va = 'top')
+                 result = self.test_results[i][1]
+                 if len(result) == 0:
+                    doc_tests_result.text(0.0, 0.8, "No edge pairs found.", fontsize = 10, va = 'top')
+                 else:
+                    doc_tests_result.text(0.0, 0.8, "Edge pairs:  " + str(result), fontsize = 10, va = 'top')
+                 
 
+                
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         plt.axis('off')
         plt.tight_layout()
         try:
             plt.savefig(output_pdf_path, format = 'pdf', bbox_inches = 'tight')
             print(f"[INFO] DiffGraph PDF done in: {output_pdf_path}")
         except Exception as e:
-            print(f"[ERROR] Erro while doing the PDF: {e}")
+            print(f"[ERROR] Error while doing the PDF: {e}")
         finally:
             plt.close()

@@ -14,7 +14,7 @@ class TotalConnectTest(Test):
         for node in self.graph.nodes:
             self.visited_states.add(node)
             for transition in node.transitions:
-                self.visited_transitions.add((node.name,transition.destination.name))
+                self.visited_transitions.add((node.name, transition.destination.name))
                 self.visited_states.add(transition.destination)
 
         content = "\n".join(node.name for node in self.visited_states)
@@ -51,3 +51,8 @@ class TotalConnectTest(Test):
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
             print("[INFO] Test data from: " + self.name + " successfully written to " + self.graph_file)
+            
+    def get_results(self):
+        nodes = { node.name for node in self.visited_states}
+        result = ['TCT', [nodes, self.visited_transitions]]
+        return result

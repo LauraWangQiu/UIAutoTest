@@ -39,3 +39,6 @@ class Test:
     def notify_update(self, attr_name, content):
         if self._update_callback:
             self._update_callback(attr_name, content)
+            
+    def get_results(self):
+        pass

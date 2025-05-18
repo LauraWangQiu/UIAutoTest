@@ -39,3 +39,7 @@ class EdgePairCovTest(Test):
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
             print("[INFO] Test data from: " + self.name + " successfully written to " + self.graph_file)
+            
+    def get_results(self):
+        result = ['EPCT', [self.edgePairCovList]]
+        return result

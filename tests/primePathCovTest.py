@@ -75,3 +75,9 @@ class PrimePathCovTest(Test):
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
             print("[INFO] Test data from: " + self.name + " successfully written to " + self.graph_file)
+            
+    def get_results(self):
+        prime_paths = [" -> ".join(node.name for node in path) for path in self.prime_paths]
+        
+        result = ['PPCT', [prime_paths]]
+        return result

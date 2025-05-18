@@ -36,3 +36,8 @@ class SelfLoopTest(Test):
             print("[ERROR] Exception while writing test data from: " + self.name + ": " + str(e))
         else:
             print("[INFO] Test data from: " + self.name + " successfully written to " + self.graph_file)
+            
+    def get_results(self):
+        nodes = { node.name for node in self.selfLoopList}
+        result = ['SLT', [nodes]]
+        return result
