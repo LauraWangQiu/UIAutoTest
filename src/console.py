@@ -35,7 +35,6 @@ class Console(App):
             tests_dir=tests_dir,
             theorical_graph_file=theorical_graph_file,
             practical_graph_file=practical_graph_file,
-            generate_graph=generate_graph,
             selected_executable=selected_executable,
             executable_delay=executable_delay,
             transition_delay=transition_delay,
@@ -51,6 +50,8 @@ class Console(App):
             solution_file=solution_file,
             pdf_file=pdf_file)
         
+        self.generate_graph = generate_graph
+       
         print("[INFO] Application initialized without window")
         if self.load_graph_from_file(self.theorical_graph_file):
             self.test_classes = self.get_test_classes()
