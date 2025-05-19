@@ -8,8 +8,9 @@ src_dir = os.path.join(current_dir, "src")
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
     
-from app import App
 from stateResetMethod import StateResetMethod
+from interface import Interface
+from console import Console
 
 """
     Load configuration from a JSON file if manually specified.
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     generate_graph =        config.get("generate_graph", True)
     selected_executable =   config.get("selected_executable", None)
     executable_delay =      config.get("executable_delay", "5")
-    transition_delay =       config.get("transition_delay", "2")
+    transition_delay =      config.get("transition_delay", "2")
     debug_images =          config.get("debug_images", False)
     timeout =               config.get("timeout", 2)
     initial_similarity =    config.get("initial_similarity", 0.99)
@@ -65,31 +66,53 @@ if __name__ == "__main__":
 
     headless = True if config_file else False
     
-    app = App(
-        java_path=java_path,
-        jython_jar=jython_jar,
-        sikulix_jar=sikulix_jar,
-        sikuli_script="src/generateGraph.py",
-        window_name="UIAutoTest",
-        window_size="800x600",
-        images_dir=images_dir,
-        tests_dir=tests_dir,
-        theorical_graph_file=theorical_graph_file,
-        practical_graph_file=practical_graph_file,
-        generate_graph=generate_graph,
-        selected_executable=selected_executable,
-        executable_delay=executable_delay,
-        transition_delay=transition_delay,
-        debug_images=debug_images,
-        timeout=timeout,
-        initial_similarity=initial_similarity,
-        min_similarity=min_similarity,
-        similarity_step=similarity_step,
-        retries=retries,
-        state_reset_method=state_reset_method,
-        external_reset_script=external_reset_script,
-        tests_to_run=tests_to_run,
-        solution_file=solution_file,
-        pdf_file=pdf_file,
-        headless=headless
-    )
+    if headless:
+        app = Console(
+            java_path=java_path,
+            jython_jar=jython_jar,
+            sikulix_jar=sikulix_jar,
+            sikuli_script="src/generateGraph.py",
+            images_dir=images_dir,
+            tests_dir=tests_dir,
+            theorical_graph_file=theorical_graph_file,
+            practical_graph_file=practical_graph_file,
+            selected_executable=selected_executable,
+            executable_delay=executable_delay,
+            transition_delay=transition_delay,
+            debug_images=debug_images,
+            timeout=timeout,
+            initial_similarity=initial_similarity,
+            min_similarity=min_similarity,
+            similarity_step=similarity_step,
+            retries=retries,
+            state_reset_method=state_reset_method,
+            external_reset_script=external_reset_script,
+            tests_to_run=tests_to_run,
+            solution_file=solution_file,
+            pdf_file=pdf_file)
+    else:
+        interface = Interface(
+            java_path=java_path,
+            jython_jar=jython_jar,
+            sikulix_jar=sikulix_jar,
+            sikuli_script="src/generateGraph.py",
+            window_name="UIAutoTest",
+            window_size="800x600",
+            images_dir=images_dir,
+            tests_dir=tests_dir,
+            theorical_graph_file=theorical_graph_file,
+            practical_graph_file=practical_graph_file,
+            selected_executable=selected_executable,
+            executable_delay=executable_delay,
+            transition_delay=transition_delay,
+            debug_images=debug_images,
+            timeout=timeout,
+            initial_similarity=initial_similarity,
+            min_similarity=min_similarity,
+            similarity_step=similarity_step,
+            retries=retries,
+            state_reset_method=state_reset_method,
+            external_reset_script=external_reset_script,
+            tests_to_run=tests_to_run,
+            solution_file=solution_file,
+            pdf_file=pdf_file)

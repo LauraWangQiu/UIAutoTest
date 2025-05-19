@@ -4,14 +4,13 @@ import sys
 import subprocess
 import threading
 
-import time
+
 import inspect
 import importlib.util
 
 from test import Test
-from graphsDef import Graph, Transition
-from actionTypes import ActionType
-from stateResetMethod import StateResetMethod
+from graphsDef import Graph
+
 import graphIO as _graph_io_module
 GraphIO = _graph_io_module.GraphIO
 import networkx as nx
@@ -27,18 +26,14 @@ class App():
         Constructor for the App class
 
         Args:
-            window_name (str): The title of the application window
-            window_size (str): The size of the application window (e.g., "800x600")
             tests_directory (str): The directory where test files are located
-            headless (bool): Whether the application is running in headless mode
     """
-    def __init__(self,
+    def __init__(self, 
                 java_path, jython_jar, sikulix_jar,
                 sikuli_script,
                 images_dir, tests_dir, 
                 theorical_graph_file,
                 practical_graph_file,
-                generate_graph,
                 selected_executable,
                 executable_delay,
                 transition_delay,
@@ -52,13 +47,13 @@ class App():
                 external_reset_script,
                 tests_to_run,
                 solution_file,
-                pdf_file,
-                headless=False):
+                pdf_file):
+        
         self.java_path = java_path                                      # Path to Java executable
         self.jython_jar = jython_jar                                    # Path to Jython jar file
         self.sikulix_jar = sikulix_jar                                  # Path to SikuliX jar file
         self.sikuli_script = sikuli_script                              # Path to Sikuli script
-        self.jython_process = None                                      # Jython process
+
         self.jython_thread = None                                       # Jython thread
             
         self.graph_io = GraphIO()                                       # GraphIO instance
@@ -66,7 +61,6 @@ class App():
         self.generated_graph = None                                     # Practical graph
         self.theorical_graph_file   = theorical_graph_file              # Theoretical graph file
         self.practical_graph_file   = practical_graph_file              # Practical graph file
-        self.generate_graph         = generate_graph                    # Flag to generate graph
         self.images_dir             = images_dir                        # Directory of images
         self.tests_dir              = tests_dir                         # Directory of tests
         self.test_classes           = None                              # List of test classes        
@@ -83,8 +77,7 @@ class App():
         self.external_reset_script  = external_reset_script             # External reset script
         self.tests_to_run           = tests_to_run                      # List of tests to run
         self.solution_file          = solution_file                     # Test solution file
-        self.pdf_file               = pdf_file                          # PDF file for graph differences and tests results
-        self.headless               = headless                          # Store the headless mode flag
+        self.pdf_file               = pdf_file                          # PDF file for graph differences and tests results                         # Store the headless mode flag
 
         self.diff = {
             'missing_nodes_prac': set(),
@@ -94,19 +87,6 @@ class App():
         }
         self.test_results = []
         
-    
-        if self.headless:
-            print("[INFO] Application initialized in headless mode")
-            if self.load_graph_from_file(self.theorical_graph_file):
-                self.test_classes = self.get_test_classes()
-                if self.generate_graph:
-                    self.generate_graph_from_executable()
-                    while self.jython_thread.is_alive():
-                        time.sleep(0.1)
-                self.run_tests()
-                self.compare()
-                self.create_PDF(self.pdf_file)
-
     """
         Load theorical graph from a file using GraphIO
     """
@@ -185,30 +165,25 @@ class App():
         self.run_jython()
 
     """
-        Run the selected tests.
+        Run the selected tests. 
     """
     def run_tests(self):
-        # If headless mode, then run tests specified from file
-        # else, run tests from the GUI
         selected_test_classes = []
-        print("holaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-        if self.headless and self.test_classes is not None:
-            available_test_classes = {name: ref for name, ref in self.test_classes}
-            for test_name in self.tests_to_run:
-                if test_name in available_test_classes:
-                    selected_test_classes.append(available_test_classes[test_name])
-                else:
-                    print(f"[ERROR] Test class '{test_name}' not found in available test classes.")
-        else:
-            selected_test_classes = [
-                test_class_ref for test_class_name, (var, test_class_ref) in self.test_checkboxes.items() if var.get()
-            ]
-
+        
+        selected_test_classes = self.get_selected_test_classes()
+        
         if selected_test_classes:
             self.execute_selected_tests(selected_test_classes)
         else:
             print("[ERROR] No tests selected.")
-
+        pass
+        
+    """
+        Base for the children for returning the selected tests for running the tests.
+    """   
+    def get_selected_test_classes(self):
+        pass 
+        
     """
         Run the Jython script to generate the graph
     """
@@ -281,6 +256,7 @@ class App():
         Compare the generated graph with specified graph
     """
     def compare(self):
+        print("aqui llega")
         file_path = os.path.abspath(self.practical_graph_file)
         # Check if the graph is already loaded
         if self.generated_graph is None:
@@ -355,37 +331,6 @@ class App():
                     differences_found += 1
         return differences_found
 
-    """
-        Restore the original stdout when the application is closed
-    """
-    def on_close(self):
-        print("[INFO] Stopping all threads...")
-        self.stop_event.set()
-
-        for after_id in self.after_ids:
-            try:
-                self.after_cancel(after_id)
-            except Exception as e:
-                print(f"[WARNING] Failed to cancel event {after_id}: {e}")
-
-        if hasattr(self, "jython_process") and self.jython_process is not None:
-            print("[INFO] Terminating Jython process...")
-            self.jython_process.terminate()
-            self.jython_process.wait()
-            print("[INFO] Jython process terminated.")
-
-        threading.Event().wait(0.5)
-
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-
-        try:
-            self.quit()
-        except Exception as e:
-            print(f"[WARNING] Failed to quit mainloop: {e}")
-
-        self.destroy()
-  
     """
         Creates a PDF with the diff graph after the comparison. 
     """                 
