@@ -35,6 +35,7 @@ class Console(App):
             tests_dir=tests_dir,
             theorical_graph_file=theorical_graph_file,
             practical_graph_file=practical_graph_file,
+            generate_graph=generate_graph,
             selected_executable=selected_executable,
             executable_delay=executable_delay,
             transition_delay=transition_delay,
