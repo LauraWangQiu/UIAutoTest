@@ -7,7 +7,7 @@ class Test:
         self.graph = graph
         self.graph_file = graph_file
         self._update_callback = None
-        print(f"[INFO] Initializing {self.name} class.")
+        print(f"Initializing {self.name} class.")
 
     """
         Returns the name of the test.

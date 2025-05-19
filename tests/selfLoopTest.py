@@ -9,7 +9,7 @@ class SelfLoopTest(Test):
         Overrides the parent run method
     """
     def run(self):
-        print("[INFO] Running " + self.name + ".")
+        print("Running " + self.name + ".")
         for node in self.graph.nodes:
             # See all the transitions of the node
             for transitions in node.transitions:

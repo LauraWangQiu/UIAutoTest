@@ -9,7 +9,7 @@ class PrimePathCovTest(Test):
         Overrides the parent run method
     """
     def run(self):
-        print("[INFO] Running " + self.name + ".")
+        print("Running " + self.name + ".")
         all_paths = []
 
         # Get all the paths

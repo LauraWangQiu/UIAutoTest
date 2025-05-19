@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import sys
 import os
+from java.lang import System
 from org.python.core import PySystemState
 
 py_sys = PySystemState()
@@ -49,7 +51,7 @@ class SikulixWrapper:
             match = self.screen.exists(Pattern(image_path).similar(actual_similarity), timeout)
             if match:
                 self.last_match_region = (match.getX(), match.getY(), match.getW(), match.getH())
-                if capture_last_match:
+                if self.debug_images:
                     self.capture_error(debug_image_name, debug_image_path, capture_last_match)
                 print("[OK] Image found.")
                 return True
@@ -207,13 +209,18 @@ class SikulixWrapper:
         :return: File path if successful; None on failure.
     """
     def capture_error(self, filename, folder=".", capture_last_match= False):
-        try:
-            if not os.path.exists(folder):
-                os.makedirs(folder)
+        try:          
+            elems_same_name = [f for f in os.listdir(folder) if os.path.basename(f) == (filename)]
+            # Check if a file with the same name already exists
+            if len(elems_same_name) > 0:
+                print("[WARNING] File with the same name already exists.")
+                filename = filename + "_" + str(len(elems_same_name)) + ".png"
+            
             if capture_last_match and self.last_match_region:
                 print("[INFO] Capturing last match region.")
                 x, y, w, h = self.last_match_region
                 reg = Region(int(x), int(y), int(w), int(h))
+
                 filepath = self.screen.capture(reg).save(folder, filename)
             else:
                 filepath = self.screen.capture().save(folder, filename)
