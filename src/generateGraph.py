@@ -79,12 +79,8 @@ class GenerateGraph:
         # Check if the needs to be copy reset
         if self.state_reset_method == StateResetMethod.COPY_RESET:
             self._copy_executable()
-        
-        # Check if the debug images directory exists
-        if self.debug_images:
-            # Empty the debug images directory
-            if os.path.exists(self.full_debug_name):
-                shutil.rmtree(self.full_debug_name)
+            
+        if self.debug_images and not os.path.exists(self.full_debug_name):
             os.makedirs(self.full_debug_name)
         
         print("[INFO] Generating graph for " + str(self.selected_executable))

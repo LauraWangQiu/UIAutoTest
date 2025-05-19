@@ -64,7 +64,6 @@ If `config.json` is passed as an argument, it will not create an interface.
 The variables in `config.json` are the following:
 
 - `java_path`: Path to java, if added to environment variables: `java`.
-- `jython_jar`: Path to jython.jar, you can download by it executing [downloadDependencies.py](downloadDependencies.py), it is set to `jython-standalone-2.7.4.jar` by default.
 - `sikulix_jar`: Path to jython.jar, it is also downloaded by it executing [downloadDependencies.py](downloadDependencies.py), it is set to `sikulixapi-2.0.5.jar` by default.
 - `images_dir`: Path to used images to generate the graph, it is set to `bin\sample_images` by default.
 - `tests_dir`: Path to designed tests to study the generated graph, it is set to `tests` by default.
