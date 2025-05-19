@@ -9,7 +9,7 @@ class EdgePairCovTest(Test):
         Overrides the parent run method
     """
     def run(self):
-        print("Running " + self.name + ".")
+        print("[INFO] Running " + self.name + ".")
         for node in self.graph.nodes:
             edge_count = {}
             for transitions in node.transitions:

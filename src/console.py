@@ -2,10 +2,12 @@ from app import App
 
 import time
 
-
+"""
+    Console class for running the application in a headless mode.
+"""
 class Console(App):
     def __init__(self,
-                java_path, jython_jar, sikulix_jar,
+                java_path, sikulix_jar,
                 sikuli_script,
                 images_dir, tests_dir, 
                 theorical_graph_file,
@@ -28,14 +30,12 @@ class Console(App):
         
         App.__init__(self=self,
             java_path=java_path,
-            jython_jar=jython_jar,
             sikulix_jar=sikulix_jar,
             sikuli_script=sikuli_script,
             images_dir=images_dir,
             tests_dir=tests_dir,
             theorical_graph_file=theorical_graph_file,
             practical_graph_file=practical_graph_file,
-            generate_graph=generate_graph,
             selected_executable=selected_executable,
             executable_delay=executable_delay,
             transition_delay=transition_delay,
@@ -56,10 +56,10 @@ class Console(App):
         print("[INFO] Application initialized without window")
         if self.load_graph_from_file(self.theorical_graph_file):
             self.test_classes = self.get_test_classes()
-            if self.generate_graph:
-                self.generate_graph_from_executable()
-                while self.jython_thread.is_alive():
-                    time.sleep(0.1)
+            if generate_graph:
+                if self.generate_graph_from_executable():
+                    while self.jython_thread.is_alive():
+                        time.sleep(0.1)
             self.run_tests()
             self.compare()
             self.create_PDF(self.pdf_file)     
@@ -77,4 +77,3 @@ class Console(App):
                 else:
                     print(f"[ERROR] Test class '{test_name}' not found in available test classes.")
         return selected_test_classes   
-                

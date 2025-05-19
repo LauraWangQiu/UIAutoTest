@@ -1,9 +1,8 @@
+from tab import Tabs
+
 import sys
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
 from tkinter.scrolledtext import ScrolledText
-
-from tab import Tabs
 
 class OutputTab(Tabs):
     def __init__(self, parent, app_reference):

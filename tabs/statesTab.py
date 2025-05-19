@@ -1,3 +1,5 @@
+from tab import Tabs
+
 import os
 import math
 import customtkinter as ctk
@@ -5,8 +7,6 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 from actionTypes import ActionType
 from graphsDef import  Transition
-
-from tab import Tabs
 
 class StatesTab(Tabs):
     def __init__(self, parent, app_reference):

@@ -17,8 +17,6 @@ def download_dependencies():
         "Linux": "https://launchpad.net/sikuli/sikulix/2.0.5/+download/sikulixapi-2.0.5-linux.jar",
         "Darwin": "https://launchpad.net/sikuli/sikulix/2.0.5/+download/sikulixapi-2.0.5-mac.jar"
     }
-    jython_url = "https://repo1.maven.org/maven2/org/python/jython-standalone/2.7.4/jython-standalone-2.7.4.jar"
-
     system = platform.system()
     sikulix_url = sikulix_urls.get(system)
 
@@ -29,10 +27,6 @@ def download_dependencies():
     # Download SikuliX API
     sikulix_file_name = "sikulixapi-2.0.5.jar"
     download_file(sikulix_url, sikulix_file_name)
-
-    # Download Jython Standalone
-    jython_file_name = "jython-standalone-2.7.4.jar"
-    download_file(jython_url, jython_file_name)
 
 if __name__ == "__main__":
     download_dependencies()

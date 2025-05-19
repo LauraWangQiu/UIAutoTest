@@ -1,10 +1,10 @@
-import customtkinter as ctk
-from tkinter import filedialog, messagebox
-from stateResetMethod import StateResetMethod
-
 from tab import Tabs
 
-class SettingTab(Tabs):
+import customtkinter as ctk
+from tkinter import filedialog
+from stateResetMethod import StateResetMethod
+
+class SettingsTab(Tabs):
     def __init__(self, parent, app_reference):
         super().__init__(parent, app_reference)
 
@@ -53,14 +53,6 @@ class SettingTab(Tabs):
         sikulix_entry.pack(fill="x", padx=10, pady=2)
         sikulix_button = ctk.CTkButton(scrollable_frame, text="Select SikuliX Jar", command=self.select_sikulix_jar)
         sikulix_button.pack(padx=10, pady=5, anchor="w")
-
-        jython_label = ctk.CTkLabel(scrollable_frame, text="Jython Jar Path:", font=ctk.CTkFont(size=12))
-        jython_label.pack(anchor="w", padx=10, pady=(10, 2))
-        self.jython_jar_var = ctk.StringVar(value=self.app.jython_jar)
-        jython_entry = ctk.CTkEntry(scrollable_frame, textvariable=self.jython_jar_var, width=400)
-        jython_entry.pack(fill="x", padx=10, pady=2)
-        jython_button = ctk.CTkButton(scrollable_frame, text="Select Jython Jar", command=self.select_jython_jar)
-        jython_button.pack(padx=10, pady=5, anchor="w")
 
         practical_graph_label = ctk.CTkLabel(scrollable_frame, text="Practical Graph File to Export:", font=ctk.CTkFont(size=12))
         practical_graph_label.pack(anchor="w", padx=10, pady=(10, 2))

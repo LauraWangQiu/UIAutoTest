@@ -10,7 +10,7 @@ class TotalConnectTest(Test):
         Overrides the parent run method
     """
     def run(self):
-        print("Running " + self.name + ".")
+        print("[INFO] Running " + self.name + ".")
         for node in self.graph.nodes:
             self.visited_states.add(node)
             for transition in node.transitions:

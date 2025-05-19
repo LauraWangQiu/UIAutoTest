@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 
 from tab import Tabs
 
@@ -8,7 +8,6 @@ class TestRunnerTab(Tabs):
     def __init__(self, parent, app_reference):
         super().__init__(parent, app_reference)
         
-
     def addTab(self):
         test_runner_tab = ctk.CTkFrame(self.app.tab_control)
         self.app.tab_control.add(test_runner_tab, text="Generate, Run & Compare")

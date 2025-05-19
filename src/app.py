@@ -29,7 +29,7 @@ class App():
             tests_directory (str): The directory where test files are located
     """
     def __init__(self, 
-                java_path, jython_jar, sikulix_jar,
+                java_path, sikulix_jar,
                 sikuli_script,
                 images_dir, tests_dir, 
                 theorical_graph_file,
@@ -50,7 +50,6 @@ class App():
                 pdf_file):
         
         self.java_path = java_path                                      # Path to Java executable
-        self.jython_jar = jython_jar                                    # Path to Jython jar file
         self.sikulix_jar = sikulix_jar                                  # Path to SikuliX jar file
         self.sikuli_script = sikuli_script                              # Path to Sikuli script
 
@@ -117,6 +116,10 @@ class App():
         test_classes = []
         test_folder = os.path.join(os.getcwd(), self.tests_dir)
 
+        if not os.path.exists(test_folder):
+            print(f"[ERROR] Test folder '{test_folder}' does not exist.")
+            return test_classes
+        
         for file_name in os.listdir(test_folder):
             if file_name.endswith(".py"):
                 file_path = os.path.join(test_folder, file_name)
@@ -136,6 +139,8 @@ class App():
 
     def update_test_output(self, test_class_name, attr_name, values):
         try:
+            if not hasattr(self, "test_output_widgets"):
+                return
             if test_class_name not in self.test_output_widgets:
                 print(f"[WARNING] No widgets found for test class '{test_class_name}'")
                 return
@@ -154,15 +159,15 @@ class App():
         Generate the graph from the selected executable calling the Jython script
     """
     def generate_graph_from_executable(self):
-        if not self.selected_executable:
-            print("[ERROR] No executable selected. Please select an executable first.")
-            return
+        if not self.selected_executable or not os.path.isfile(self.selected_executable):
+            print(f"[ERROR] Executable '{self.selected_executable}' not found. Please select a valid executable.")
+            return False
         
         if not self.images_dir:
             print("[ERROR] No images directory selected. Please select an images directory first.")
-            return
+            return False
 
-        self.run_jython()
+        return self.run_jython()
 
     """
         Run the selected tests. 
@@ -193,7 +198,7 @@ class App():
                 command = [
                     self.java_path,
                     "-cp",
-                    f"{self.jython_jar};{self.sikulix_jar}",
+                    self.sikulix_jar,
                     "org.python.util.jython",
                     self.sikuli_script,
                     "--images_dir", self.images_dir,
@@ -231,6 +236,7 @@ class App():
 
         self.jython_thread = threading.Thread(target=execute_command, daemon=True)
         self.jython_thread.start()
+        return True
 
     """
         Execute the selected tests
@@ -256,7 +262,6 @@ class App():
         Compare the generated graph with specified graph
     """
     def compare(self):
-        print("aqui llega")
         file_path = os.path.abspath(self.practical_graph_file)
         # Check if the graph is already loaded
         if self.generated_graph is None:

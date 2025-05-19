@@ -7,14 +7,13 @@ import tkinter.ttk as ttk
 import threading
 
 from tabs.testRunnerTab import TestRunnerTab
-from tabs.settingTab import SettingTab
+from tabs.settingsTab import SettingsTab
 from tabs.outputTab import OutputTab
 from tabs.statesTab import StatesTab
 
 class Interface(App, ctk.CTk):
-        
     def __init__(self,
-                java_path, jython_jar, sikulix_jar,
+                java_path, sikulix_jar,
                 sikuli_script,
                 images_dir, tests_dir, 
                 theorical_graph_file,
@@ -43,7 +42,6 @@ class Interface(App, ctk.CTk):
         ctk.CTk.__init__(self)
         App.__init__(self=self,
             java_path=java_path,
-            jython_jar=jython_jar,
             sikulix_jar=sikulix_jar,
             sikuli_script=sikuli_script,
             images_dir=images_dir,
@@ -112,7 +110,7 @@ class Interface(App, ctk.CTk):
         self.test_runner_tab = TestRunnerTab(self.tab_control, self)
 
         # Settings tab
-        self.setting_tab = SettingTab(self.tab_control, self)
+        self.setting_tab = SettingsTab(self.tab_control, self)
 
         # Output tab
         self.output_tab = OutputTab(self.tab_control, self)

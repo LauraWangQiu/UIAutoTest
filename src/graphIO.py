@@ -60,6 +60,10 @@ class GraphIO:
                         raw_path = parts[2]
                         node = self.graph.add_node(name)
                         if node:
+                            image_path = os.path.join(img_dir, raw_path)
+                            if not os.path.isfile(image_path):
+                                print("[ERROR] Image file not found: " + image_path)
+                                continue
                             node.set_image(os.path.join(img_dir, raw_path))
 
                     elif parts[0] == 'e':
